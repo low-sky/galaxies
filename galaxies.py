@@ -31,6 +31,8 @@ class Galaxy(object):
             warnings.warn("Unsuccessful query to NED")
             pass
 
+
+
         
     def echoes (self, x):
         return x
