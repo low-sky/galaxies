@@ -51,6 +51,9 @@ class Galaxy(object):
             self.inclination = Angle(30*u.deg)
             self.vsys = 1575*u.km/u.s
 
+    def __repr__(self):
+        return "Galaxy {0} at RA={1}, DEC={2}".format(self.name,self.center_position.ra,self.center_position.dec)
+
     def radius(self, skycoord = None, ra = None, dec = None, 
                header = None, returnXY = False):
         if skycoord:
