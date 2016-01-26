@@ -23,9 +23,6 @@ class Galaxy(object):
             if len(t)==1:
                 self.canonical_name = t['Object Name'][0]
                 self.velocity = t['Velocity'][0]*u.km/u.s
-#                self.center_position = ICRS(ra=t['RA(deg)'][0],
-#                                           dec=t['DEC(deg)'][0],
-#                                           unit=(u.degree,u.degree))
                 self.center_position = SkyCoord(t['RA(deg)'][0], t['DEC(deg)'][0],frame='fk5',
                                            unit='degree')
                 self.redshift = t['Redshift'][0]
