@@ -37,6 +37,20 @@ class Galaxy(object):
             self.position_angle = Angle(202*u.deg)
             self.inclination = Angle(56*u.deg)
             self.vsys = -179*u.km/u.s
+        if name == 'M83':
+            self.name = 'M83'
+            self.distance = 4.8e6*u.pc
+#            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
+            self.position_angle = Angle(225*u.deg)
+            self.inclination = Angle(24*u.deg)
+            self.vsys = 514*u.km/u.s
+        if name == 'M100':
+            self.name = 'M100'
+            self.distance = 14.3e6*u.pc
+#            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
+            self.position_angle = Angle(153*u.deg)
+            self.inclination = Angle(30*u.deg)
+            self.vsys = 1575*u.km/u.s
 
     def radius(self, skycoord = None, ra = None, dec = None, 
                header = None, returnXY = False):
