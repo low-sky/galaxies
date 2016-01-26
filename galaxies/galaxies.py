@@ -58,7 +58,7 @@ class Galaxy(object):
                header = None, returnXY = False):
         if skycoord:
             PAs = self.center_position.position_angle(skycoord)
-        elif (ra and dec):
+        elif (np.any(ra) and np.any(dec)):
             Offsets = SkyCoord(ra,dec,unit=(u.deg,u.deg))
             PAs = self.center_position.position_angle(Offsets)
         else:
