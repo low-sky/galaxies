@@ -29,21 +29,21 @@ class Galaxy(object):
         except:
             warnings.warn("Unsuccessful query to NED")
             pass
-        if name == 'M33':
+        if name.upper() == 'M33':
             self.name = 'M33'
             self.distance = 8.4e5*u.pc
             self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
             self.position_angle = Angle(202*u.deg)
             self.inclination = Angle(56*u.deg)
             self.vsys = -179*u.km/u.s
-        if name == 'M83':
+        if name.upper() == 'M83':
             self.name = 'M83'
             self.distance = 4.8e6*u.pc
 #            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
             self.position_angle = Angle(225*u.deg)
             self.inclination = Angle(24*u.deg)
             self.vsys = 514*u.km/u.s
-        if name == 'M100':
+        if name.upper() == 'M100':
             self.name = 'M100'
             self.distance = 14.3e6*u.pc
 #            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
