@@ -4,6 +4,7 @@ import astropy.units as u
 from astropy.table import Table
 import warnings
 import numpy as np
+import astropy
 
 class Galaxy(object):
     def __init__(self, name):
@@ -58,11 +59,18 @@ class Galaxy(object):
                header = None, returnXY = False):
         if skycoord:
             PAs = self.center_position.position_angle(skycoord)
+        elif type(header) is astropy.io.fits.header.Header:
+            from astropy.wcs import WCS
+            w = WCS(header)
+            ymat, xmat = np.indices((w.celestial._naxis2,w.celestial._naxis1))
+            ramat, decmat = w.wcs_pix2world(xmat,ymat,0)
+            Offsets = SkyCoord(ramat,decmat,unit=(u.deg,u.deg))
+            PAs = self.center_position.position_angle(Offsets)
         elif (np.any(ra) and np.any(dec)):
             Offsets = SkyCoord(ra,dec,unit=(u.deg,u.deg))
             PAs = self.center_position.position_angle(Offsets)
         else:
-            warnings.warn('You must specify either RA/DEC or a skycoord')
+            warnings.warn('You must specify either RA/DEC, a header or a skycoord')
         GalPA = PAs - self.position_angle
         GCDist = Offsets.separation(self.center_position)
     # Transform into galaxy plane
