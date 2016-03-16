@@ -63,7 +63,7 @@ class Galaxy(object):
             from astropy.wcs import WCS
             w = WCS(header)
             ymat, xmat = np.indices((w.celestial._naxis2,w.celestial._naxis1))
-            ramat, decmat = w.wcs_pix2world(xmat,ymat,0)
+            ramat, decmat = w.celestial.wcs_pix2world(xmat,ymat,0)
             Offsets = SkyCoord(ramat,decmat,unit=(u.deg,u.deg))
             PAs = self.center_position.position_angle(Offsets)
         elif (np.any(ra) and np.any(dec)):
