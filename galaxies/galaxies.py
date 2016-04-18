@@ -51,6 +51,12 @@ class Galaxy(object):
             self.position_angle = Angle(153*u.deg)
             self.inclination = Angle(30*u.deg)
             self.vsys = 1575*u.km/u.s
+        if name.upper() == 'M64':
+            self.name = 'M64'
+            self.distance = 4.1e6*u.pc
+            self.position_angle = Angle(-67.6*u.deg)
+            self.inclination = Angle(58.9*u.deg)
+            self.vsys = 411.3*u.km/u.s
 
     def __repr__(self):
         return "Galaxy {0} at RA={1}, DEC={2}".format(self.name,self.center_position.ra,self.center_position.dec)
