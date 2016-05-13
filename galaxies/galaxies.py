@@ -73,6 +73,7 @@ class Galaxy(object):
                wcs=None, header=None, returnXY=False):
         if skycoord:
             PAs = self.center_position.position_angle(skycoord)
+            Offsets = skycoord
         elif isinstance(header, fits.Header):
             w = WCS(header)
             ymat, xmat = np.indices((w.celestial._naxis2, w.celestial._naxis1))
