@@ -100,6 +100,13 @@ class Galaxy(object):
         else:
             return Rgal
 
+    def position_angles(self, skycoord=None, ra=None, dec=None,
+                        wcs=None, header=None):
+        X, Y = self.radius(skycoord=skycoord, ra=ra, dec=dec, wcs=wcs,
+                           header=header, returnXY=True)
+
+        return Angle(np.arctan2(Y, X))
+
 # push or pull override table using astropy.table
 
 # Check name equivalencies
