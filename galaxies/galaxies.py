@@ -70,7 +70,7 @@ class Galaxy(object):
                                                       self.center_position.dec)
 
     def radius(self, skycoord=None, ra=None, dec=None,
-               wcs=None, header=None, returnXY=False):
+               header=None, returnXY=False):
         if skycoord:
             PAs = self.center_position.position_angle(skycoord)
             Offsets = skycoord
@@ -101,8 +101,8 @@ class Galaxy(object):
             return Rgal
 
     def position_angles(self, skycoord=None, ra=None, dec=None,
-                        wcs=None, header=None):
-        X, Y = self.radius(skycoord=skycoord, ra=ra, dec=dec, wcs=wcs,
+                        header=None):
+        X, Y = self.radius(skycoord=skycoord, ra=ra, dec=dec,
                            header=header, returnXY=True)
 
         return Angle(np.arctan2(Y, X))
