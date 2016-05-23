@@ -40,7 +40,7 @@ class Galaxy(object):
             self.center_position = \
                 SkyCoord(23.461667, 30.660194, unit=(u.deg, u.deg),
                          frame='fk5')
-            self.position_angle = Angle(202 * u.deg)
+            self.position_angle = Angle(220 * u.deg)
             self.inclination = Angle(56 * u.deg)
             self.vsys = -179 * u.km / u.s
         if name.upper() == 'M83':
