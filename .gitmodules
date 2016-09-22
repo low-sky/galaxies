@@ -2,5 +2,5 @@
 	path = astropy_helpers
 	url = https://github.com/astropy/astropy-helpers.git
 [submodule "galbase"]
-	path = galbase
+	path = galaxies/data/galbase
 	url = git@github.com:akleroy/galbase.git
