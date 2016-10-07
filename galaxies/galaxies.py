@@ -8,11 +8,13 @@ from astropy.wcs import WCS
 import warnings
 import numpy as np
 from astropy.utils.data import get_pkg_data_filename
+
 def parse_galtable(galobj,name):
     table_name = get_pkg_data_filename('data/gal_base.fits',
                                        package='galaxies')
     galtable = Table.read(table_name)
     hits = [x for x in galtable if name in x['ALIAS']]
+
     if len(hits)==1:
         thisobj = hits[0]
         galobj.name = thisobj['NAME'].strip()
@@ -38,6 +40,21 @@ class Galaxy(object):
         self.position_angle = None
         self.redshift = None
         self.vsys = None
+        if not parse_galtable(self, name):
+            try:
+                t = Ned.query_object(name)
+                if len(t) == 1:
+                    self.canonical_name = t['Object Name'][0]
+                    self.velocity = t['Velocity'][0] * u.km / u.s
+                    self.center_position = \
+                        SkyCoord(t['RA(deg)'][0], t['DEC(deg)'][0], 
+                                 frame='fk5',
+                                 unit='degree')
+                    self.redshift = t['Redshift'][0]
+            except:
+                warnings.warn("Unsuccessful query to NED")
+                pass
+
         if name.upper() == 'M33':
             self.name = 'M33'
             self.distance = 8.4e5 * u.pc
@@ -50,7 +67,6 @@ class Galaxy(object):
         elif name.upper() == 'M83':
             self.name = 'M83'
             self.distance = 4.8e6 * u.pc
-#            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
             self.position_angle = Angle(225 * u.deg)
             self.inclination = Angle(24 * u.deg)
             self.vsys = 514 * u.km / u.s
@@ -68,20 +84,7 @@ class Galaxy(object):
             self.inclination = Angle(58.9 * u.deg)
             self.vsys = 411.3 * u.km / u.s
         else:
-            if not parse_galtable(self, name):
-                try:
-                    t = Ned.query_object(name)
-                    if len(t) == 1:
-                        self.canonical_name = t['Object Name'][0]
-                        self.velocity = t['Velocity'][0] * u.km / u.s
-                        self.center_position = \
-                            SkyCoord(t['RA(deg)'][0], t['DEC(deg)'][0], 
-                                     frame='fk5',
-                                     unit='degree')
-                        self.redshift = t['Redshift'][0]
-                except:
-                    warnings.warn("Unsuccessful query to NED")
-                    pass
+            pass
 
     def __repr__(self):
         return "Galaxy {0} at RA={1}, DEC={2}".format(self.name,
