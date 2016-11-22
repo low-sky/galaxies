@@ -89,11 +89,11 @@ class Galaxy(object):
             self.position_angle = Angle(-67.6 * u.deg)
             self.inclination = Angle(58.9 * u.deg)
             self.vsys = 411.3 * u.km / u.s
-        elif name.upper() = 'NGC1672':
+        elif name.upper() == 'NGC1672':
             self.position_angle = Angle(170 * u.deg)
-        elif name.upper() = 'NGC4535':
+        elif name.upper() == 'NGC4535':
             self.position_angle = Angle(0 * u.deg)
-        elif name.upper() = '':
+        elif name.upper() == 'NGC5068':
             self.position_angle = Angle(110 * u.deg)
             
         else:
