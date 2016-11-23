@@ -70,6 +70,12 @@ class Galaxy(object):
             self.position_angle = Angle(225 * u.deg)
             self.inclination = Angle(24 * u.deg)
             self.vsys = 514 * u.km / u.s
+        elif name.upper() == 'NGC4303':
+            self.name = 'NGC4303'
+            self.distance = 14.5 * u.Mpc
+            self.position_angle = Angle(0 * u.deg)
+            self.inclination = Angle(18 * u.deg)
+            self.vsys = 1569 * u.km / u.s
         elif name.upper() == 'M100':
             self.name = 'M100'
             self.distance = 14.3e6 * u.pc
@@ -83,6 +89,13 @@ class Galaxy(object):
             self.position_angle = Angle(-67.6 * u.deg)
             self.inclination = Angle(58.9 * u.deg)
             self.vsys = 411.3 * u.km / u.s
+        elif name.upper() == 'NGC1672':
+            self.position_angle = Angle(170 * u.deg)
+        elif name.upper() == 'NGC4535':
+            self.position_angle = Angle(0 * u.deg)
+        elif name.upper() == 'NGC5068':
+            self.position_angle = Angle(110 * u.deg)
+            
         else:
             pass
 
