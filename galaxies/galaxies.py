@@ -42,7 +42,7 @@ class Galaxy(object):
 
         self.name = name
 # An astropy coordinates structure
-        self.coordinates = None
+        self.center_position = None
 # This is the preferred name in a database.
         self.canonical_name = None
 # With units
@@ -56,7 +56,7 @@ class Galaxy(object):
             if not isinstance(params, dict):
                 raise TypeError("params must be a dictionary.")
 
-            required_params = ["coordinates", "distance", "inclination",
+            required_params = ["center_position", "distance", "inclination",
                                "position_angle", "vsys"]
             optional_params = ["canonical_name", "redshift"]
 
@@ -68,7 +68,8 @@ class Galaxy(object):
                 setattr(self, par, params[par])
 
             for par in optional_params:
-                setattr(self, par, params[par])
+                if par in keys:
+                    setattr(self, par, params[par])
 
         else:
 
