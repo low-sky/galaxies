@@ -27,11 +27,22 @@ def parse_galtable(galobj,name):
         galobj.position_angle = thisobj['POSANG_DEG'] * u.deg
         return True
 
+
 class Galaxy(object):
-    def __init__(self, name):
+    '''
+
+    Parameters
+    ----------
+    name : str
+        Name of the galaxy.the
+    params : dict, optional
+        Optionally provide custom parameter values as a dictionary.
+    '''
+    def __init__(self, name, params=None):
+
         self.name = name
 # An astropy coordinates structure
-        self.coordinates = None
+        self.center_position = None
 # This is the preferred name in a database.
         self.canonical_name = None
 # With units
@@ -40,64 +51,87 @@ class Galaxy(object):
         self.position_angle = None
         self.redshift = None
         self.vsys = None
-        if not parse_galtable(self, name):
-            try:
-                t = Ned.query_object(name)
-                if len(t) == 1:
-                    self.canonical_name = t['Object Name'][0]
-                    self.velocity = t['Velocity'][0] * u.km / u.s
-                    self.center_position = \
-                        SkyCoord(t['RA(deg)'][0], t['DEC(deg)'][0], 
-                                 frame='fk5',
-                                 unit='degree')
-                    self.redshift = t['Redshift'][0]
-            except:
-                warnings.warn("Unsuccessful query to NED")
-                pass
 
-        if name.upper() == 'M33':
-            self.name = 'M33'
-            self.distance = 8.4e5 * u.pc
-            self.center_position = \
-                SkyCoord(23.461667, 30.660194, unit=(u.deg, u.deg),
-                         frame='fk5')
-            self.position_angle = Angle(202 * u.deg)
-            self.inclination = Angle(56 * u.deg)
-            self.vsys = -179 * u.km / u.s
-        elif name.upper() == 'M83':
-            self.name = 'M83'
-            self.distance = 4.8e6 * u.pc
-            self.position_angle = Angle(225 * u.deg)
-            self.inclination = Angle(24 * u.deg)
-            self.vsys = 514 * u.km / u.s
-        elif name.upper() == 'NGC4303':
-            self.name = 'NGC4303'
-            self.distance = 14.5 * u.Mpc
-            self.position_angle = Angle(0 * u.deg)
-            self.inclination = Angle(18 * u.deg)
-            self.vsys = 1569 * u.km / u.s
-        elif name.upper() == 'M100':
-            self.name = 'M100'
-            self.distance = 14.3e6 * u.pc
-#            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
-            self.position_angle = Angle(153 * u.deg)
-            self.inclination = Angle(30 * u.deg)
-            self.vsys = 1575 * u.km / u.s
-        elif name.upper() == 'M64':
-            self.name = 'M64'
-            self.distance = 4.1e6 * u.pc
-            self.position_angle = Angle(-67.6 * u.deg)
-            self.inclination = Angle(58.9 * u.deg)
-            self.vsys = 411.3 * u.km / u.s
-        elif name.upper() == 'NGC1672':
-            self.position_angle = Angle(170 * u.deg)
-        elif name.upper() == 'NGC4535':
-            self.position_angle = Angle(0 * u.deg)
-        elif name.upper() == 'NGC5068':
-            self.position_angle = Angle(110 * u.deg)
-            
+        if params is not None:
+            if not isinstance(params, dict):
+                raise TypeError("params must be a dictionary.")
+
+            required_params = ["center_position", "distance", "inclination",
+                               "position_angle", "vsys"]
+            optional_params = ["canonical_name", "redshift"]
+
+            keys = params.keys()
+            for par in required_params:
+                if par not in keys:
+                    raise ValueError("params is missing the required key"
+                                     " {}".format(par))
+                setattr(self, par, params[par])
+
+            for par in optional_params:
+                if par in keys:
+                    setattr(self, par, params[par])
+
         else:
-            pass
+
+            if not parse_galtable(self, name):
+                try:
+                    t = Ned.query_object(name)
+                    if len(t) == 1:
+                        self.canonical_name = t['Object Name'][0]
+                        self.velocity = t['Velocity'][0] * u.km / u.s
+                        self.center_position = \
+                            SkyCoord(t['RA(deg)'][0], t['DEC(deg)'][0],
+                                     frame='fk5',
+                                     unit='degree')
+                        self.redshift = t['Redshift'][0]
+                except:
+                    warnings.warn("Unsuccessful query to NED")
+                    pass
+
+            if name.upper() == 'M33':
+                self.name = 'M33'
+                self.distance = 8.4e5 * u.pc
+                self.center_position = \
+                    SkyCoord(23.461667, 30.660194, unit=(u.deg, u.deg),
+                             frame='fk5')
+                self.position_angle = Angle(202 * u.deg)
+                self.inclination = Angle(56 * u.deg)
+                self.vsys = -179 * u.km / u.s
+            elif name.upper() == 'M83':
+                self.name = 'M83'
+                self.distance = 4.8e6 * u.pc
+                self.position_angle = Angle(225 * u.deg)
+                self.inclination = Angle(24 * u.deg)
+                self.vsys = 514 * u.km / u.s
+            elif name.upper() == 'NGC4303':
+                self.name = 'NGC4303'
+                self.distance = 14.5 * u.Mpc
+                self.position_angle = Angle(0 * u.deg)
+                self.inclination = Angle(18 * u.deg)
+                self.vsys = 1569 * u.km / u.s
+            elif name.upper() == 'M100':
+                self.name = 'M100'
+                self.distance = 14.3e6 * u.pc
+    #            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
+                self.position_angle = Angle(153 * u.deg)
+                self.inclination = Angle(30 * u.deg)
+                self.vsys = 1575 * u.km / u.s
+            elif name.upper() == 'M64':
+                self.name = 'M64'
+                self.distance = 4.1e6 * u.pc
+                self.position_angle = Angle(-67.6 * u.deg)
+                self.inclination = Angle(58.9 * u.deg)
+                self.vsys = 411.3 * u.km / u.s
+            elif name.upper() == 'NGC1672':
+                self.position_angle = Angle(170 * u.deg)
+            elif name.upper() == 'NGC4535':
+                self.position_angle = Angle(0 * u.deg)
+            elif name.upper() == 'NGC5068':
+                self.position_angle = Angle(110 * u.deg)
+
+            else:
+                raise ValueError("The information for galaxy {} could not be "
+                                 "found.")
 
     def __repr__(self):
         return "Galaxy {0} at RA={1}, DEC={2}".format(self.name,
