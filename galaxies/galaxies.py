@@ -2,7 +2,7 @@
 from astropy.coordinates import SkyCoord, Angle, FK5
 from astroquery.ned import Ned
 import astropy.units as u
-from astropy.table import Table
+from astropy.table import Table, Column
 from astropy.io import fits
 from astropy.wcs import WCS
 import warnings
@@ -83,7 +83,8 @@ class Galaxy(object):
                             SkyCoord(t['RA(deg)'][0], t['DEC(deg)'][0],
                                      frame='fk5',
                                      unit='degree')
-                        self.redshift = t['Redshift'][0]
+                        self.redshift = t['Redshift'][0] * \
+                            u.dimensionless_unscaled
                 except:
                     warnings.warn("Unsuccessful query to NED")
                     pass
@@ -175,6 +176,36 @@ class Galaxy(object):
                            header=header, returnXY=True)
 
         return Angle(np.arctan2(Y, X))
+
+    def to_table(self):
+        '''
+        Return an `~astropy.table.Table` with the galactic parameters.
+        '''
+
+        tab = Table()
+
+        tab["Name"] = Column([self.name], unit=None)
+        tab["Center Position"] = Column([self.center_position])
+
+        tab["Distance"] = Column([self.distance.value],
+                                 unit=self.distance.unit)
+        tab["Inclination"] = Column([self.inclination.value],
+                                    unit=self.inclination.unit)
+        tab["PA"] = Column([self.position_angle.value],
+                           unit=self.position_angle.unit)
+        tab["Vsys"] = Column([self.vsys.value],
+                             unit=self.vsys.unit)
+
+        if self.redshift is not None:
+            tab["Redshift"] = Column([self.redshift.value],
+                                     unit=self.redshift.unit)
+        self.canonical_name = None
+
+        if self.canonical_name is not None:
+            tab["Canonical Name"] = Column([self.canonical_name],
+                                           unit=None)
+
+        return tab
 
 # push or pull override table using astropy.table
 
