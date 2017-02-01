@@ -25,6 +25,7 @@ def parse_galtable(galobj,name):
         galobj.distance = thisobj['DIST_MPC'] * u.Mpc
         galobj.inclination = thisobj['INCL_DEG'] * u.deg
         galobj.position_angle = thisobj['POSANG_DEG'] * u.deg
+        galobj.provenance = 'GalBase'
         return True
 
 
@@ -51,7 +52,8 @@ class Galaxy(object):
         self.position_angle = None
         self.redshift = None
         self.vsys = None
-
+        self.provenance = None
+        
         if params is not None:
             if not isinstance(params, dict):
                 raise TypeError("params must be a dictionary.")
@@ -84,6 +86,7 @@ class Galaxy(object):
                                      frame='fk5',
                                      unit='degree')
                         self.redshift = t['Redshift'][0]
+                        self.provenance = 'NED'
                 except:
                     warnings.warn("Unsuccessful query to NED")
                     pass
@@ -97,18 +100,21 @@ class Galaxy(object):
                 self.position_angle = Angle(202 * u.deg)
                 self.inclination = Angle(56 * u.deg)
                 self.vsys = -179 * u.km / u.s
+                self.provenance = 'Override'
             elif name.upper() == 'M83':
                 self.name = 'M83'
                 self.distance = 4.8e6 * u.pc
                 self.position_angle = Angle(225 * u.deg)
                 self.inclination = Angle(24 * u.deg)
                 self.vsys = 514 * u.km / u.s
+                self.provenance = 'Override'
             elif name.upper() == 'NGC4303':
                 self.name = 'NGC4303'
                 self.distance = 14.5 * u.Mpc
                 self.position_angle = Angle(0 * u.deg)
                 self.inclination = Angle(18 * u.deg)
                 self.vsys = 1569 * u.km / u.s
+                self.provenance = 'Override'
             elif name.upper() == 'M100':
                 self.name = 'M100'
                 self.distance = 14.3e6 * u.pc
@@ -116,22 +122,28 @@ class Galaxy(object):
                 self.position_angle = Angle(153 * u.deg)
                 self.inclination = Angle(30 * u.deg)
                 self.vsys = 1575 * u.km / u.s
+                self.provenance = 'Override'
             elif name.upper() == 'M64':
                 self.name = 'M64'
                 self.distance = 4.1e6 * u.pc
                 self.position_angle = Angle(-67.6 * u.deg)
                 self.inclination = Angle(58.9 * u.deg)
                 self.vsys = 411.3 * u.km / u.s
+                self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
                 self.position_angle = Angle(170 * u.deg)
+                self.provenance = 'Override'
             elif name.upper() == 'NGC4535':
                 self.position_angle = Angle(0 * u.deg)
+                self.provenance = 'Override'
             elif name.upper() == 'NGC5068':
                 self.position_angle = Angle(110 * u.deg)
+                self.provenance = 'Override'
+#            else:
 
-            else:
-                raise ValueError("The information for galaxy {} could not be "
-                                 "found.")
+            if not self.provenance:
+                raise ValueError("The information for galaxy {}".format(name)+
+                                 "could not be found.")
 
     def __repr__(self):
         return "Galaxy {0} at RA={1}, DEC={2}".format(self.name,
