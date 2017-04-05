@@ -150,16 +150,28 @@ class Galaxy(object):
                                                       self.center_position.ra,
                                                       self.center_position.dec)
 
+    def skycoord_grid(self, header=None, wcs=None):
+        '''
+        Return a grid of RA and Dec values.
+        '''
+        if header is not None:
+            w = WCS(header)
+        elif wcs is not None:
+            w = wcs
+        else:
+            raise ValueError("header or wcs must be given.")
+        w = WCS(header)
+        ymat, xmat = np.indices((w.celestial._naxis2, w.celestial._naxis1))
+        ramat, decmat = w.celestial.wcs_pix2world(xmat, ymat, 0)
+        return SkyCoord(ramat, decmat, unit=(u.deg, u.deg))
+
     def radius(self, skycoord=None, ra=None, dec=None,
                header=None, returnXY=False):
         if skycoord:
             PAs = self.center_position.position_angle(skycoord)
             Offsets = skycoord
         elif isinstance(header, fits.Header):
-            w = WCS(header)
-            ymat, xmat = np.indices((w.celestial._naxis2, w.celestial._naxis1))
-            ramat, decmat = w.celestial.wcs_pix2world(xmat, ymat, 0)
-            Offsets = SkyCoord(ramat, decmat, unit=(u.deg, u.deg))
+            Offsets = self.skycoord_grid(header=header)
             PAs = self.center_position.position_angle(Offsets)
         elif np.any(ra) and np.any(dec):
             Offsets = SkyCoord(ra, dec, unit=(u.deg, u.deg))
