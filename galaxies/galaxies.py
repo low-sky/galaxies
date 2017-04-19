@@ -53,7 +53,7 @@ class Galaxy(object):
         self.redshift = None
         self.vsys = None
         self.provenance = None
-        
+
         if params is not None:
             if not isinstance(params, dict):
                 raise TypeError("params must be a dictionary.")
@@ -99,21 +99,21 @@ class Galaxy(object):
                              frame='fk5')
                 self.position_angle = Angle(202 * u.deg)
                 self.inclination = Angle(56 * u.deg)
-                self.vsys = -179 * u.km / u.s
+                self.velocity = -179 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'M83':
                 self.name = 'M83'
                 self.distance = 4.8e6 * u.pc
                 self.position_angle = Angle(225 * u.deg)
                 self.inclination = Angle(24 * u.deg)
-                self.vsys = 514 * u.km / u.s
+                self.velocity = 514 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'NGC4303':
                 self.name = 'NGC4303'
                 self.distance = 14.5 * u.Mpc
                 self.position_angle = Angle(0 * u.deg)
                 self.inclination = Angle(18 * u.deg)
-                self.vsys = 1569 * u.km / u.s
+                self.velocity = 1569 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'M100':
                 self.name = 'M100'
@@ -121,14 +121,14 @@ class Galaxy(object):
     #            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
                 self.position_angle = Angle(153 * u.deg)
                 self.inclination = Angle(30 * u.deg)
-                self.vsys = 1575 * u.km / u.s
+                self.velocity = 1575 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'M64':
                 self.name = 'M64'
                 self.distance = 4.1e6 * u.pc
                 self.position_angle = Angle(-67.6 * u.deg)
                 self.inclination = Angle(58.9 * u.deg)
-                self.vsys = 411.3 * u.km / u.s
+                self.velocity = 411.3 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
                 self.position_angle = Angle(170 * u.deg)
