@@ -188,6 +188,16 @@ class Galaxy(object):
 
         return Angle(np.arctan2(Y, X))
 
+    def to_center_position_pixel(self, wcs=None, header=None):
+
+        if header is not None:
+            wcs = WCS(header)
+
+        if wcs is None:
+            raise ValueError("Either wcs or header must be given.")
+
+        return self.center_position.to_pixel(wcs)
+
 # push or pull override table using astropy.table
 
 # Check name equivalencies
