@@ -124,7 +124,7 @@ def rotmap(name='NGC1672'):
     I = gal.inclination
     RA_cen = gal.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees 
     Dec_cen = gal.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees
-    theta_o = gal.position_angle / u.deg * u.deg        # Position angle (angle from "north" of line of nodes)
+    theta_o = (gal.position_angle / u.deg * u.deg) - (180*u.deg)        # Position angle (angle from "north" of line of nodes)
     d = (gal.distance).to(u.parsec)                     # Distance to galaxy, from Mpc to pc
 
     
@@ -149,6 +149,6 @@ def rotmap(name='NGC1672'):
     Dec = skycoord.dec                           # Grid of Dec in degrees.
 
 
-    vobs = (vsys.value + vrot(R)*np.sin(I)*np.sin( np.arctan2(Y,X) )) * (u.km/u.s)
+    vobs = (vsys.value - vrot(R)*np.sin(I)*np.sin( np.arctan2(Y,X) )) * (u.km/u.s)     # (!!!!) NOTE: This SUBTRACTS instead of adds the vrot*sin(i)*sin(...) part. Is this correct...?
     
-    return vobs, R, Dec, RA
+    return vobs, R, Dec, RA, vrot
