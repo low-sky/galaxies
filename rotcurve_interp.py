@@ -28,11 +28,15 @@ def interp(name,smoothing=False):
     -----------
     name : str
         Name of the galaxy that we care about.
+    smoothing : bool
+            Enables or disables smoothing. (False by
+            default. Enabling it doesn't seem to help 
+            much.)
         
     Returns:
     --------
     R : np.ndarray
-        Radii of galaxy, in pc.
+        1D array of radii of galaxy, in pc.
     vrot_i : scipy.interpolate.interpolate.interp1d
         Function for the interpolated rotation
         curve.
@@ -97,9 +101,10 @@ def interp(name,smoothing=False):
     tab['vrot'].unit = 'km/s'
     tab['k2'].unit = '(km/s/pc)^2'
     
-    vrot_i = interpolate.interp1d(tab['R'],tab['vrot'])      # The function "y" interpolates values of vrot at some radius.
-    k2_i = interpolate.interp1d(tab['R'],tab['k2'])          # The function "y" interpolates values of vrot at some radius.
-
+    vrot_i = interpolate.interp1d(tab['R'],tab['vrot'])      # The function "vrot_i" interpolates values of 
+                                                             #     vrot at some radius.
+    k2_i = interpolate.interp1d(tab['R'],tab['k2'])          # The function "k2_i" interpolates values of 
+                                                             #     \kappa^2 at some radius.
     return R, vrot_i, k2_i
 
 
@@ -129,8 +134,8 @@ def rotmap(name):
     gal = Galaxy(name)
     vsys = gal.vsys
     if name=='M33':
-        vsys = -179.*u.km/u.s
-        # For some godforsaken reason, M33's "Galaxy" object does not have a systemic velocity.
+        vsys = gal.velocity
+        # For some reason, M33's "Galaxy" object has velocity listed as "velocity" instead of "vsys".
     I = gal.inclination
     RA_cen = gal.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees 
     Dec_cen = gal.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees
