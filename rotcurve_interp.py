@@ -127,7 +127,7 @@ def rotmap(name):
     R : np.ndarray
         Map of radii of galaxy, in pc.
     Dec, RA : np.ndarray
-        1D arrays of the ranges of Dec and 
+        2D arrays of the ranges of Dec and 
         RA (respectively), in degrees.
     '''    
     # Basic info
