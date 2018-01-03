@@ -40,16 +40,15 @@ def interp(name,smoothing=False):
         Function for the interpolated epicyclic
         frequency squared.
     '''
-    if name=='NGC1672':
-        fname = "phangsdata/NGC1672_co21_12m+7m+tp_RC.txt"
-        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
+    
     # Basic info
     gal = Galaxy(name)
     d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
     
+    # Rotation Curves
     if name=='NGC1672':
-        #(!) WARNING - This works for the very, very specific case of where the text file is just two columns,
-        #     exactly as described below. Not quite sure how to get it working for the general case yet.
+        fname = "phangsdata/NGC1672_co21_12m+7m+tp_RC.txt"
+        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
         R, vrot = np.loadtxt(fname,skiprows=True,unpack=True)
         # R = Radius from center of galaxy, in arcsec.
         # vrot = Rotational velocity, in km/s.
@@ -59,10 +58,10 @@ def interp(name,smoothing=False):
         vrot = m33['Vt']
     # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
     
+    # Adding a (0,0) data point to rotation curve
     if R[0]!=0:
         R = np.roll(np.concatenate((R,[0]),0),1)
         vrot = np.roll(np.concatenate((vrot,[0]),0),1)
-        # Adds a (0,0) data point.
     
     R = R*u.arcsec
     vrot = vrot*u.km/u.s
@@ -81,7 +80,7 @@ def interp(name,smoothing=False):
         t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
     vrot_spline = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
     
-    # "Redefining" things
+    # Creating "higher-resolution" rotation curve
     Nsteps = 10000
     R = np.linspace(R.min(),R.max(),Nsteps)
     vrot = vrot_spline  # This is now a function, not an array.
@@ -120,7 +119,7 @@ def rotmap(name):
     --------
     vobs : np.ndarray
         Map of observed velocity, in km/s.
-    Radi : np.ndarray
+    R : np.ndarray
         Map of radii of galaxy, in pc.
     Dec, RA : np.ndarray
         1D arrays of the ranges of Dec and 
@@ -145,6 +144,7 @@ def rotmap(name):
         #gal.position_angle = gal.position_angle + 180*u.deg
         print "Modified PA is "+str(gal.position_angle)+"degrees CCW from North."
     elif name=='M33':
+        print "Provided PA is "+str(gal.position_angle)+"degrees CCW from North."
         print "It's M33, so the PA doesn't need fixing."
 
 
