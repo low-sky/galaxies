@@ -210,6 +210,7 @@ class Galaxy(object):
 
         return self.center_position.to_pixel(wcs)
 
+
     def interp(self, smoothing=False):
         '''
         Reads a provided rotation curve table from the
