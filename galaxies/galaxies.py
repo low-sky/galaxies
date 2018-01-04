@@ -9,6 +9,11 @@ import warnings
 import numpy as np
 from astropy.utils.data import get_pkg_data_filename
 
+import pandas as pd
+from scipy import interpolate			# Had to be imported here, otherwise I'd
+						# get a "global name 'interpolate'/'pd' is not
+						# defined" error message for some reason.
+
 def parse_galtable(galobj,name):
     table_name = get_pkg_data_filename('data/gal_base.fits',
                                        package='galaxies')
@@ -237,9 +242,7 @@ class Galaxy(object):
             Function for the interpolated epicyclic
             frequency squared.
         '''
-	from scipy import interpolate			# Had to be imported here, otherwise I'd
-							# get a "global name 'interpolate' is not
-							# defined" error message for some reason.
+
 
         # Basic info
         d = (self.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc

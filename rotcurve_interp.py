@@ -183,3 +183,87 @@ def rotmap(name):
     vobs = (vsys.value + vrot(R)*np.sin(I)*np.cos( np.arctan2(Y,X) )) * (u.km/u.s)
     
     return vobs, R, Dec, RA
+
+
+def bspline(X,Y,knots=5,k=3,lowclamp=False, highclamp=False):
+    '''
+    Returns a BSpline interpolation function
+    of a provided 1D curve.
+    With fewer knots, this will provide a
+    smooth curve that ignores local wiggles.
+    
+    Parameters:
+    -----------
+    X,Y : np.ndarray
+        1D arrays for the curve being interpolated.
+    knots : int
+        Number of INTERNAL knots, i.e. the number
+        of breakpoints that are being considered
+        when generating the BSpline.
+    k : int
+        Degree of the BSpline. Recommended to leave
+        at 3.
+    lowclamp : bool
+        Enables or disables clamping at the lowest
+        X-value.
+    highclamp : bool
+        Enables or disables clamping at the highest
+        X-value.
+        
+    Returns:
+    --------
+    spl : scipy.interpolate._bsplines.BSpline
+        Interpolation function that works over X's
+        domain.
+    '''
+    
+    # Creating the knots
+    t_int = np.linspace(X.min(),X.max(),knots)  # Internal knots, incl. beginning and end points of domain.
+
+    t_begin = np.linspace(X.min(),X.min(),k)
+    t_end   = np.linspace(X.max(),X.max(),k)
+    t = np.r_[t_begin,t_int,t_end]              # The entire knot vector.
+    
+    # Generating the spline
+    w = np.zeros(X.shape)+1                     # Weights.
+    if lowclamp==True:
+        w[0]=X.max()*1000000                    # Setting a high weight for the X.min() term.
+    if highclamp==True:
+        w[-1]=X.max()*1000000                   # Setting a high weight for the X.max() term.
+    spl = make_lsq_spline(X, Y, t, k,w)
+    
+    return spl
+
+def localshear(name,knots=5):
+    '''
+    Returns the local shear parameter (i.e. the
+    Oort A constant) for a galaxy with a provided
+    rotation curve, based on Equation 4 in Martin
+    & Kennicutt (2001).
+    
+    Parameters:
+    -----------
+    name : str
+        Name of the galaxy in question.
+    knots : int
+        Number of INTERNAL knots in BSpline
+        representation of rotation curve.
+        
+    Returns:
+    --------
+    A : np.ndarray
+        Oort A "constant", as a function of 
+        radius R.
+    '''
+    # Use "interp" to generate R, vrot.
+    R, vrot, k2 = gal.interp(smoothing=0)
+    
+    # Smooth spline of vrot.
+    vrot_spl = bspline(R,vrot(R),knots=knots,lowclamp=True)
+    
+    # Oort A constant.
+    Omega = vrot_spl(R) / R     # Angular velocity.
+    dOmegadR = np.gradient(Omega,R)
+    A = -1./2. * R*dOmegadR
+    
+    return A
