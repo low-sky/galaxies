@@ -16,7 +16,7 @@ import pandas as pd
 import statsmodels.formula.api as smf
 
 
-def interp(name,smoothing=False):
+def rotcurve(name,smooth='False',knots=8):
     '''
     Reads a provided rotation curve table and
     returns interpolator functions for rotational
@@ -28,21 +28,24 @@ def interp(name,smoothing=False):
     -----------
     name : str
         Name of the galaxy that we care about.
-    smoothing : bool
-            Enables or disables smoothing. (False by
-            default. Enabling it doesn't seem to help 
-            much.)
+    smooth : bool
+        Determines whether the returned rotation
+        curve returned is smoothed or not.
+    knots : int
+        Number of internal knots in BSpline of
+        vrot, which is used to calculate epicyclic
+        frequency.
         
     Returns:
     --------
     R : np.ndarray
         1D array of radii of galaxy, in pc.
-    vrot_i : scipy.interpolate.interpolate.interp1d
+    vrot : scipy.interpolate._bsplines.BSpline
         Function for the interpolated rotation
         curve.
-    k2_i : scipy.interpolate.interpolate.interp1d
+    k : scipy.interpolate.interp1d
         Function for the interpolated epicyclic
-        frequency squared.
+        frequency.
     '''
     
     # Basic info
@@ -67,45 +70,37 @@ def interp(name,smoothing=False):
         R = np.roll(np.concatenate((R,[0]),0),1)
         vrot = np.roll(np.concatenate((vrot,[0]),0),1)
     
+    # Units & conversions
     R = R*u.arcsec
-    vrot = vrot*u.km/u.s
-        
-    # Unit conversions
+    vrot = vrot*u.km/u.s    
     R = R.to(u.rad)            # Radius, in radians.
     R = (R*d).value            # Radius, in pc, but treated as unitless.
     
-    # Cubic Interpolation of vrot(R)
-    K=3                # Order of the BSpline
-    if smoothing==True:
-        m = R.size
-        s = m-np.sqrt(2*m) #(https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.splrep.html)
-        t,c,k = interpolate.splrep(R,vrot,s=s,k=K)
-    else:
-        t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
-    vrot_spline = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
     
+    
+    # BSpline of vrot(R)
+    K=3                # Order of the BSpline
+    t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
+    vrot = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
+                                                            # 'vrot' is now a function, not an array.
     # Creating "higher-resolution" rotation curve
     Nsteps = 10000
     R = np.linspace(R.min(),R.max(),Nsteps)
-    vrot = vrot_spline  # This is now a function, not an array.
     
+    # SMOOTH BSpline of vrot(R)
+    vrot_s = bspline(R,vrot(R),knots=knots,lowclamp=True)
+
     
     # Epicyclic Frequency
-    dVdR = np.gradient(vrot(R),R)
-    k2 =  2.*(vrot(R)**2 / R**2 + vrot(R)/R*dVdR)    # This is \kappa^2.
+    dVdR = np.gradient(vrot_s(R),R)
+    k2 =  2.*(vrot_s(R)**2 / R**2 + vrot_s(R)/R*dVdR)
+    k = interpolate.interp1d(R,np.sqrt(k2))
     
     
-    # INCLUDE k IN TABLE
-    tab = Table([R,vrot(R),k2], names=('R','vrot','k2'), meta={'name':'Radius, Rotational Velocity, and Epicyclic Frequency'})
-    tab['R'].unit = 'pc'
-    tab['vrot'].unit = 'km/s'
-    tab['k2'].unit = '(km/s/pc)^2'
-    
-    vrot_i = interpolate.interp1d(tab['R'],tab['vrot'])      # The function "vrot_i" interpolates values of 
-                                                             #     vrot at some radius.
-    k2_i = interpolate.interp1d(tab['R'],tab['k2'])          # The function "k2_i" interpolates values of 
-                                                             #     \kappa^2 at some radius.
-    return R, vrot_i, k2_i
+    if smooth==True:
+        return R, vrot_s, k
+    else:
+        return R, vrot, k
 
 
 def rotmap(name):
@@ -144,13 +139,13 @@ def rotmap(name):
     d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
 
     # Fixing the Position Angle (if necessary):
-    if name=='NGC1672':
-        print "Provided PA is "+str(gal.position_angle)+"degrees CCW from North."
-        #gal.position_angle = gal.position_angle + 180*u.deg
-        print "Modified PA is "+str(gal.position_angle)+"degrees CCW from North."
-    elif name=='M33':
-        print "Provided PA is "+str(gal.position_angle)+"degrees CCW from North."
-        print "It's M33, so the PA doesn't need fixing."
+    #if name=='NGC1672':
+    #    print "Provided PA is "+str(gal.position_angle)+"degrees CCW from North."
+    #    #gal.position_angle = gal.position_angle + 180*u.deg
+    #    print "Modified PA is "+str(gal.position_angle)+"degrees CCW from North."
+    #elif name=='M33':
+    #    print "Provided PA is "+str(gal.position_angle)+"degrees CCW from North."
+    #    print "It's M33, so the PA doesn't need fixing."
 
 
     # Header
@@ -160,7 +155,7 @@ def rotmap(name):
         hdr = fits.getheader('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
 
     # vrot Interpolation
-    R_1d, vrot, k2_discard = interp(name,smoothing=0)  # Creates "vrot" interpolation function, and 1D array of R.
+    R_1d, vrot, k_discard = rotcurve(name,smooth=0)  # Creates "vrot" interpolation function, and 1D array of R.
 
 
     # Generating displayable grids
@@ -185,7 +180,7 @@ def rotmap(name):
     return vobs, R, Dec, RA
 
 
-def bspline(X,Y,knots=5,k=3,lowclamp=False, highclamp=False):
+def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     '''
     Returns a BSpline interpolation function
     of a provided 1D curve.
@@ -255,15 +250,153 @@ def localshear(name,knots=5):
         Oort A "constant", as a function of 
         radius R.
     '''
-    # Use "interp" to generate R, vrot.
-    R, vrot, k2 = gal.interp(smoothing=0)
+    gal = Galaxy(name)
     
-    # Smooth spline of vrot.
-    vrot_spl = bspline(R,vrot(R),knots=knots,lowclamp=True)
+    # Use "interp" to generate R, vrot (smoothed).
+    R, vrot, k_discard = gal.interp(smoothing=1, knots=knots)
     
     # Oort A constant.
-    Omega = vrot_spl(R) / R     # Angular velocity.
+    Omega = vrot(R) / R     # Angular velocity.
     dOmegadR = np.gradient(Omega,R)
     A = -1./2. * R*dOmegadR
     
     return A
+
+def linewidth_iso(name,knots=8):
+    '''
+    Returns the effective LoS velocity dispersion
+    due to the galaxy's rotation, sigma_gal, for
+    the isotropic case.
+    
+    Parameters:
+    -----------
+    name : str
+        Name of the galaxy in question.
+    knots : int
+        Number of INTERNAL knots in BSpline
+        representation of rotation curve, which
+        is used in calculation of epicyclic
+        frequency (and, therefore, sigma_gal).
+        
+    Returns:
+    --------
+    R : np.ndarray
+        Radius array.
+    sigma_gal : scipy.interpolate._bsplines.BSpline
+        Interpolation function for sigma_gal that
+        works over R.
+    '''
+    gal = Galaxy(name)
+    
+    # Beam
+    if name.upper()=='NGC1672':
+        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
+    else:
+        print "ERROR : Only NGC1672 is supported."
+        return
+    beam = hdr['BMAJ']*u.deg                    # Beam size, in degrees
+    beam = beam.to(u.rad)                       # Beam size, in radians
+    d = (gal.distance).to(u.pc)
+    Rc = beam*d / u.rad                         # Beam size, in parsecs
+    
+    # Use "interp" to generate R, vrot (smoothed), k.
+    R, vrot, k = gal.rotcurve(smooth=1,knots=knots)
+    
+    # Calculate sigma_gal = kappa*Rc
+    sigma_gal = k(R)*Rc
+
+    # Removing nans and infs
+    # (Shouldn't be anything significant-- just a "nan" at R=0.)
+    index = np.arange(sigma_gal.size)
+    R_clean = np.delete(R, index[np.isnan(sigma_gal)==True])
+    sigma_gal_clean = np.delete(sigma_gal, index[np.isnan(sigma_gal)==True])
+    sigma_gal = bspline(R_clean,sigma_gal_clean,knots=20)
+
+
+    # Cubic Interpolation of sigma_gal
+    #K=3     # Order of the BSpline
+    #t,c,k = interpolate.splrep(R,sigma_gal,s=0,k=K)
+    #sigma_gal_spline = interpolate.BSpline(t,c,k, extrapolate=False)     # Cubic interpolation of sigma_gal(R).
+    
+    return R, sigma_gal
+
+def moments(name,mode=''):
+    '''
+    Returns things like 'sigma' or 'Sigma' for
+    a galaxy where the moment maps are provided.
+    Basically, just the Warmup.py stuff. Only
+    NGC1672 is supported at the moment.
+    
+    Parameters:
+    -----------
+    name : str
+        Name of the galaxy in question.
+    mode : str
+        mode=='beam' : returns beam size, in pc.
+        mode=='sigma': returns rad,sigma.
+        mode=='Sigma': returns rad,Sigma.
+
+    Returns:
+    --------
+    R : np.ndarray
+        Radius array.
+    sigma_gal : scipy.interpolate._bsplines.BSpline
+        Interpolation function for sigma_gal that
+        works over R.
+    '''
+    if name.upper()!='NGC1672':
+        print "Only NGC1672 is supported."
+        return
+    # Warmup.py stuff, for NGC1672. 
+    # We want to get the line width, sigma.
+
+    # Initializing
+    if name.upper()=='NGC1672':
+        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
+        I_mom0 = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
+        I_mom1 = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_mom1.fits') 
+        I_max = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_tpeak.fits')
+    elif name.upper()=='M33':
+        hdr = fits.getheader\
+            ('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+    gal = Galaxy(name)
+    rad = gal.radius(header=hdr)
+    rad = rad.to(u.pc)                                      # Converts rad from Mpc to pc.
+    d = gal.distance
+    d = d.to(u.pc)                                          # Converts d from Mpc to pc.
+
+        
+    
+
+    # Pixel sizes
+    pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))*u.deg # The size of each pixel, in degrees. 
+                                                                         # Ignore that third dimension; that's 
+                                                                         # pixel size for the speed.
+    print "Pixel size, in degrees = "+str(pixsizes_deg[0])
+    pixsizes = pixsizes_deg[0].to(u.rad)                    # Pixel size, in radians.
+    pcperpixel =  pixsizes.value*d                          # Number of parsecs per pixel.
+    print "Pixel size, in parsecs = "+str(pcperpixel)
+    pcperdeg = pcperpixel / pixsizes_deg[0]
+    print "There are +"+str(pcperdeg)+"."
+
+    # Beam width
+    beam = hdr['BMAJ']                                      # Beam size, in degrees
+    beam = beam * pcperdeg                                  # Beam size, in pc
+
+    # Gradient of mom1
+    gradv = ndimage.sobel(I_mom1/pcperpixel)              # Sobel gradient of I_mom1; = grad(mean velocity), in km/s/pc
+    gradvl = ndimage.sobel(I_mom1 * beam / pcperpixel)    # Sobel gradient of I_mom1 * beam width, in km/s
+
+    # Line width, Surface density
+    alpha = 6.7
+    sigma = I_mom0 / (np.sqrt(2*np.pi * I_max))
+    Sigma = alpha*I_mom0
+    
+    if mode=='beam':
+        return beam
+    elif mode=='sigma':
+        return rad, sigma
+    elif mode=='Sigma':
+        return rad, Sigma
+    else:
+        print "SELECT A MODE."

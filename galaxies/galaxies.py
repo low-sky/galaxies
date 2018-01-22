@@ -216,33 +216,37 @@ class Galaxy(object):
         return self.center_position.to_pixel(wcs)
 
 
-    def interp(self, smoothing=False):
+    def rotcurve(self,smooth='False',knots=8):
         '''
-        Reads a provided rotation curve table from the
-        "phangsdata" folder, and returns interpolator 
-        functions for rotational velocity vs radius, 
-        and epicyclic frequency vs radius.
+        Reads a provided rotation curve table and
+        returns interpolator functions for rotational
+        velocity vs radius, and epicyclic frequency vs
+        radius.
         WARNING: Only for NGC1672 and M33 at the moment.
 
         Parameters:
         -----------
-        smoothing : bool
-            Enables or disables smoothing. (False by
-            default. Enabling it doesn't seem to help 
-            much.)
+        name : str
+            Name of the galaxy that we care about.
+	smooth : bool
+	    Determines whether the returned rotation
+	    curve returned is smoothed or not.
+	knots : int
+	    Number of internal knots in BSpline of
+	    vrot, which is used to calculate epicyclic
+	    frequency.
 
         Returns:
         --------
         R : np.ndarray
             1D array of radii of galaxy, in pc.
-        vrot_i : scipy.interpolate.interpolate.interp1d
+        vrot : scipy.interpolate._bsplines.BSpline
             Function for the interpolated rotation
             curve.
-        k2_i : scipy.interpolate.interpolate.interp1d
+        k : scipy.interpolate.interp1d
             Function for the interpolated epicyclic
-            frequency squared.
+            frequency.
         '''
-
 
         # Basic info
         d = (self.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
@@ -258,55 +262,88 @@ class Galaxy(object):
             m33 = pd.read_csv('phangsdata/m33_rad.out.csv')
             R = m33['r']
             vrot = m33['Vt']
-        # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but
-        #     both are treated as unitless!
+        # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
 
         # Adding a (0,0) data point to rotation curve
         if R[0]!=0:
             R = np.roll(np.concatenate((R,[0]),0),1)
             vrot = np.roll(np.concatenate((vrot,[0]),0),1)
 
+        # Units & conversions
         R = R*u.arcsec
-        vrot = vrot*u.km/u.s
-
-        # Unit conversions
+        vrot = vrot*u.km/u.s    
         R = R.to(u.rad)            # Radius, in radians.
         R = (R*d).value            # Radius, in pc, but treated as unitless.
 
-        # Cubic Interpolation of vrot(R)
-        K=3                # Order of the BSpline
-        if smoothing==True:
-            m = R.size
-            s = m-np.sqrt(2*m) #(https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.splrep.html)
-            t,c,k = interpolate.splrep(R,vrot,s=s,k=K)
-        else:
-            t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
-        vrot_spline = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
+        def bspline(X,Y,knots,k=3,lowclamp=False, highclamp=False):
+	    '''
+	    Returns a BSpline interpolation function
+	    of a provided 1D curve.
+	    With fewer knots, this will provide a
+	    smooth curve that ignores local wiggles.
+	    
+	    Parameters:
+	    -----------
+	    X,Y : np.ndarray
+		1D arrays for the curve being interpolated.
+	    knots : int
+		Number of INTERNAL knots, i.e. the number
+		of breakpoints that are being considered
+		when generating the BSpline.
+	    k : int
+		Degree of the BSpline. Recommended to leave
+		at 3.
+	    lowclamp : bool
+		Enables or disables clamping at the lowest
+		X-value.
+	    highclamp : bool
+		Enables or disables clamping at the highest
+		X-value.
+		
+	    Returns:
+	    --------
+	    spl : scipy.interpolate._bsplines.BSpline
+		Interpolation function that works over X's
+		domain.
+	    '''
+	    
+	    # Creating the knots
+	    t_int = np.linspace(X.min(),X.max(),knots)  # Internal knots, incl. beginning and end points of domain.
 
+	    t_begin = np.linspace(X.min(),X.min(),k)
+	    t_end   = np.linspace(X.max(),X.max(),k)
+	    t = np.r_[t_begin,t_int,t_end]              # The entire knot vector.
+	    
+	    # Generating the spline
+	    w = np.zeros(X.shape)+1                     # Weights.
+	    if lowclamp==True:
+		w[0]=X.max()*1000000                    # Setting a high weight for the X.min() term.
+	    if highclamp==True:
+		w[-1]=X.max()*1000000                   # Setting a high weight for the X.max() term.
+	    spl = interpolate.make_lsq_spline(X, Y, t, k,w)
+	    
+	    return spl
+        # BSpline of vrot(R)
+        K=3                # Order of the BSpline
+        t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
+        vrot = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
+                                                                # 'vrot' is now a function, not an array.
         # Creating "higher-resolution" rotation curve
         Nsteps = 10000
         R = np.linspace(R.min(),R.max(),Nsteps)
-        vrot = vrot_spline  # This is now a function, not an array.
 
+        # SMOOTH BSpline of vrot(R)
+        vrot_s = bspline(R,vrot(R),knots=knots,lowclamp=True)
 
         # Epicyclic Frequency
-        dVdR = np.gradient(vrot(R),R)
-        k2 =  2.*(vrot(R)**2 / R**2 + vrot(R)/R*dVdR)    # This is \kappa^2.
+        dVdR = np.gradient(vrot_s(R),R)
+        k2 =  2.*(vrot_s(R)**2 / R**2 + vrot_s(R)/R*dVdR)
+        k = interpolate.interp1d(R,np.sqrt(k2))
 
-
-        # INCLUDE k IN TABLE
-        tab = Table([R,vrot(R),k2], names=('R','vrot','k2'), \
-                    meta={'name':'Radius, Rotational Velocity, and Epicyclic Frequency'})
-        tab['R'].unit = 'pc'
-        tab['vrot'].unit = 'km/s'
-        tab['k2'].unit = '(km/s/pc)^2'
-
-        vrot_i = interpolate.interp1d(tab['R'],tab['vrot'])      # The function "vrot_i" interpolates values of 
-                                                                 #     vrot at some radius.
-        k2_i = interpolate.interp1d(tab['R'],tab['k2'])          # The function "k2_i" interpolates values of 
-                                                                 #     \kappa^2 at some radius.
-
-        return R, vrot_i, k2_i
+        if smooth==True:
+            return R, vrot_s, k
+        else:
+            return R, vrot, k
 
     def rotmap(self):
         '''
@@ -326,7 +363,7 @@ class Galaxy(object):
             Map of observed velocity, in km/s.
         R : np.ndarray
             Map of radii of galaxy, in pc.
-        Dec, RA : np.ndarray 
+        Dec, RA : np.ndarray
             Maps of Dec and RA (respectively), 
             in degrees.
         '''    
@@ -351,8 +388,8 @@ class Galaxy(object):
             ('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
 
         # vrot Interpolation
-        R_1d, vrot, k2_discard = self.interp(smoothing=0)  # Creates "vrot" interpolation function,
-                                                           #    and 1D array of R.
+        R_1d, vrot, k_discard = self.rotcurve(self)    # Creates "vrot" interpolation function,
+                                                       #    and 1D array of R.
 
 
         # Generating displayable grids
