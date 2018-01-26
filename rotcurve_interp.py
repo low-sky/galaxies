@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 from scipy import ndimage, misc, interpolate
-from scipy.interpolate import BSpline
+from scipy.interpolate import BSpline, make_lsq_spline
 
 import astropy.io.fits as fits
 import astropy.units as u
@@ -229,7 +229,7 @@ def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     
     return spl
 
-def localshear(name,knots=5):
+def localshear(name,knots=8):
     '''
     Returns the local shear parameter (i.e. the
     Oort A constant) for a galaxy with a provided
@@ -246,19 +246,20 @@ def localshear(name,knots=5):
         
     Returns:
     --------
-    A : np.ndarray
+    A : scipy.interpolate._bsplines.BSpline
         Oort A "constant", as a function of 
         radius R.
     '''
     gal = Galaxy(name)
     
     # Use "interp" to generate R, vrot (smoothed).
-    R, vrot, k_discard = gal.interp(smoothing=1, knots=knots)
+    R, vrot, k_discard = gal.rotcurve(smooth=True, knots=knots)
     
     # Oort A constant.
     Omega = vrot(R) / R     # Angular velocity.
     dOmegadR = np.gradient(Omega,R)
     A = -1./2. * R*dOmegadR
+    A = bspline(R[np.isfinite(A)],A[np.isfinite(A)],knots=999)
     
     return A
 
@@ -291,10 +292,23 @@ def linewidth_iso(name,knots=8):
     # Beam
     if name.upper()=='NGC1672':
         hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
+    elif name.upper()=='M33':
+        hdr = fits.getheader\
+            ('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+            # WARNING: The IRAM .fits files give headers that galaxies.py misinterprets somehow,
+            #    causing the galaxy to appear weirdly warped and lopsided.
+            # WARNING: The peakvels.fits gives accurate data, but does not contain beam information.
+            #    The IRAM .fits files contain beam information which should be interpreted correctly.
+        hdr_beam = fits.getheader\
+            ('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')  # We're just using this one for the beam.
+    
+    # Beam width
+    if name.upper()=='M33':
+        # This is just because M33 needs one .fits files for headers to be properly interpreted, and another
+        #    to provide beam information.
+        beam = hdr_beam['BMAJ']*u.deg
     else:
-        print "ERROR : Only NGC1672 is supported."
-        return
-    beam = hdr['BMAJ']*u.deg                    # Beam size, in degrees
+        beam = hdr['BMAJ']*u.deg                     # Beam size, in degrees   
     beam = beam.to(u.rad)                       # Beam size, in radians
     d = (gal.distance).to(u.pc)
     Rc = beam*d / u.rad                         # Beam size, in parsecs
@@ -324,8 +338,7 @@ def moments(name,mode=''):
     '''
     Returns things like 'sigma' or 'Sigma' for
     a galaxy where the moment maps are provided.
-    Basically, just the Warmup.py stuff. Only
-    NGC1672 is supported at the moment.
+    Basically, just the Warmup.py stuff.
     
     Parameters:
     -----------
@@ -344,21 +357,27 @@ def moments(name,mode=''):
         Interpolation function for sigma_gal that
         works over R.
     '''
-    if name.upper()!='NGC1672':
-        print "Only NGC1672 is supported."
-        return
-    # Warmup.py stuff, for NGC1672. 
-    # We want to get the line width, sigma.
+    # Warmup.py stuff, originally for NGC1672.
 
     # Initializing
     if name.upper()=='NGC1672':
         hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
-        I_mom0 = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
+        I_mom0 = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')  # In K km/s.
         I_mom1 = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_mom1.fits') 
-        I_max = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_tpeak.fits')
+        I_max = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_tpeak.fits')  # Peak temperature, in K.
     elif name.upper()=='M33':
         hdr = fits.getheader\
             ('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+            # WARNING: The IRAM .fits files give headers that galaxies.py misinterprets somehow,
+            #    causing the galaxy to appear weirdly warped and lopsided.
+            # WARNING: The peakvels.fits gives accurate data, but does not contain beam information.
+            #    The IRAM .fits files contain beam information which should be interpreted correctly.
+        hdr_beam = fits.getheader\
+            ('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')  # We're just using this one for the beam.
+        I_mom0 = fits.getdata('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')/1000. # Now in K km/s.
+        I_mom1 = fits.getdata(\
+                'phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+        I_max = fits.getdata('notphangsdata/m33.co21_iram.14B-088_HI.peaktemps.fits')   # Peak T, in K.
     gal = Galaxy(name)
     rad = gal.radius(header=hdr)
     rad = rad.to(u.pc)                                      # Converts rad from Mpc to pc.
@@ -380,7 +399,12 @@ def moments(name,mode=''):
     print "There are +"+str(pcperdeg)+"."
 
     # Beam width
-    beam = hdr['BMAJ']                                      # Beam size, in degrees
+    if name.upper()=='M33':
+        # This is just because M33 needs one .fits files for headers to be properly interpreted, and another
+        #    to provide beam information.
+        beam = hdr_beam['BMAJ']
+    else:
+        beam = hdr['BMAJ']                                  # Beam size, in degrees
     beam = beam * pcperdeg                                  # Beam size, in pc
 
     # Gradient of mom1
