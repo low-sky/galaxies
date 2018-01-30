@@ -136,7 +136,7 @@ class Galaxy(object):
                 self.velocity = 411.3 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
-                self.position_angle = Angle(124 * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
+        	self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
                 #self.position_angle = Angle(170 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC4535':
@@ -260,8 +260,8 @@ class Galaxy(object):
             # R = Radius from center of galaxy, in arcsec.
             # vrot = Rotational velocity, in km/s.
         elif self.name.upper()=='M33':
-            m33 = pd.read_csv('phangsdata/m33_rad.out.csv')
-            R = m33['r']*3.0                             # m33['r'] is in pixel units, and 3 pixel units make 1".
+            m33 = pd.read_csv('phangsdata/m33_rad.out_fixed.csv')
+            R = m33['r']					# Rotation curve, in arcsecs.
             vrot = m33['Vt']
         # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
 

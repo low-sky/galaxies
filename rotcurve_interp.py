@@ -60,7 +60,7 @@ def rotcurve(name,smooth='False',knots=8):
         # R = Radius from center of galaxy, in arcsec.
         # vrot = Rotational velocity, in km/s.
     elif name=='M33':
-        m33 = pd.read_csv('phangsdata/m33_rad.out.csv')
+        m33 = pd.read_csv('phangsdata/m33_rad.out_fixed.csv')
         R = m33['r']
         vrot = m33['Vt']
     # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
@@ -128,7 +128,7 @@ def rotmap(name):
     # Basic info
     gal = Galaxy(name)
     vsys = gal.vsys
-    if name=='M33':
+    if name.upper()=='M33':
         vsys = gal.velocity
         # For some reason, M33's "Galaxy" object has velocity listed as "velocity" instead of "vsys".
     I = gal.inclination
@@ -137,15 +137,6 @@ def rotmap(name):
     PA = (gal.position_angle / u.deg * u.deg)        # Position angle (angle from N to line of nodes)
                                                      # NOTE: The x-direction is defined as the LoN.
     d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
-
-    # Fixing the Position Angle (if necessary):
-    #if name=='NGC1672':
-    #    print "Provided PA is "+str(gal.position_angle)+"degrees CCW from North."
-    #    #gal.position_angle = gal.position_angle + 180*u.deg
-    #    print "Modified PA is "+str(gal.position_angle)+"degrees CCW from North."
-    #elif name=='M33':
-    #    print "Provided PA is "+str(gal.position_angle)+"degrees CCW from North."
-    #    print "It's M33, so the PA doesn't need fixing."
 
 
     # Header
