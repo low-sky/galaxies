@@ -364,9 +364,9 @@ class Galaxy(object):
         '''    
         # Basic info
         vsys = self.vsys
-        if self.name.upper()=='M33':
+        if vsys==None:
             vsys = self.velocity
-            # For some reason, M33's "Galaxy" object has velocity listed as "velocity" instead of "vsys".
+            # For some reason, some galaxies (M33, NGC4303...) have velocity listed as "velocity" instead of "vsys".
         I = self.inclination
         RA_cen = self.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees 
         Dec_cen = self.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees

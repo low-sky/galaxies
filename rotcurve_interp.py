@@ -129,9 +129,9 @@ def rotmap(name):
     # Basic info
     gal = Galaxy(name)
     vsys = gal.vsys
-    if name.upper()=='M33':
+    if vsys==None:
         vsys = gal.velocity
-        # For some reason, M33's "Galaxy" object has velocity listed as "velocity" instead of "vsys".
+        # For some reason, some galaxies (M33, NGC4303...) have velocity listed as "velocity" instead of "vsys".
     I = gal.inclination
     RA_cen = gal.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees 
     Dec_cen = gal.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees
