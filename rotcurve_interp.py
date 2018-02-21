@@ -104,7 +104,7 @@ def rotcurve(name,smooth='False',knots=8):
     else:
         return R, vrot, k
 
-def rotmap(name):
+def rotmap(name,header=None):
     '''
     Returns "observed velocity" map, and "rotation
     map". (The latter is just to make sure that the
@@ -139,18 +139,12 @@ def rotmap(name):
                                                      # NOTE: The x-direction is defined as the LoN.
     d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
 
-
-    # Header
-    if name.upper()=='M33':
-        hdr = fits.getheader('notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
-    else:
-        hdr = fits.getheader('phangsdata/'+name.lower()+'_co21_12m+7m+tp_mom0.fits')
     # vrot Interpolation
     R_1d, vrot, k_discard = rotcurve(name,smooth=0)  # Creates "vrot" interpolation function, and 1D array of R.
 
 
     # Generating displayable grids
-    X,Y = gal.radius(header=hdr, returnXY=True)  # Coordinate grid in galaxy plane, as "seen" by telescope, in Mpc.
+    X,Y = gal.radius(header=header, returnXY=True)  # Coordinate grid in galaxy plane, as "seen" by telescope, in Mpc.
     X = X.to(u.pc)
     Y = Y.to(u.pc)                               # Now they're in parsecs.
     # NOTE: - X is parallel to the line of nodes. The PA is simply angle from North to X-axis.
@@ -161,7 +155,7 @@ def rotmap(name):
     R = (R.value<R_1d.max()).astype(int) * R  
     R[ R==0 ] = np.nan                           # Grid of radius, with values outside interpolation range removed.
 
-    skycoord = gal.skycoord_grid(header=hdr)     # Coordinates (RA,Dec) of the above grid at each point, in degrees.
+    skycoord = gal.skycoord_grid(header=header)     # Coordinates (RA,Dec) of the above grid at each point, in degrees.
     RA = skycoord.ra                             # Grid of RA in degrees.
     Dec = skycoord.dec                           # Grid of Dec in degrees.
 

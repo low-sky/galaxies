@@ -346,11 +346,16 @@ class Galaxy(object):
         else:
             return R, vrot, k
 
-    def rotmap(self):
+    def rotmap(self,header=None):
         '''
         Returns "observed velocity" map, and "rotation
         map". (The latter is just to make sure that the
         code is working properly.)
+
+        Parameters:
+        -----------
+        header : astropy.io.fits.header.Header
+            Header for the galaxy.
 
         Returns:
         --------
@@ -375,20 +380,13 @@ class Galaxy(object):
         d = (self.distance).to(u.parsec)                 # Distance to galaxy, from Mpc to pc
         
 
-        # Header
-        if self.name.upper()=='M33':
-            hdr = fits.getheader(\
-	    'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
-        else:
-            hdr = fits.getheader('phangsdata/'+self.name.lower()+'_co21_12m+7m+tp_mom0.fits')
-
         # vrot Interpolation
         R_1d, vrot, k_discard = self.rotcurve(self)    # Creates "vrot" interpolation function,
                                                        #    and 1D array of R.
 
 
         # Generating displayable grids
-        X,Y = self.radius(header=hdr, returnXY=True)  # Coordinate grid in galaxy plane, as "seen" by telescope,
+        X,Y = self.radius(header=header, returnXY=True)  # Coordinate grid in galaxy plane, as "seen" by telescope,
                                                       #    in Mpc.
         X = X.to(u.pc)
         Y = Y.to(u.pc)                               # Now they're in parsecs.
@@ -401,7 +399,7 @@ class Galaxy(object):
         R[ R==0 ] = np.nan                           # Grid of radius, with values outside interpolation range
                                                      #    removed.
 
-        skycoord = self.skycoord_grid(header=hdr)   # Coordinates (RA,Dec) of the above grid at each point, 
+        skycoord = self.skycoord_grid(header=header)   # Coordinates (RA,Dec) of the above grid at each point, 
                                                     #    in degrees.
         RA = skycoord.ra                             # Grid of RA in degrees.
         Dec = skycoord.dec                           # Grid of Dec in degrees.
