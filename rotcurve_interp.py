@@ -49,21 +49,23 @@ def rotcurve(name,smooth='False',knots=8):
     '''
     
     # Basic info
-    gal = Galaxy(name)
+    gal = Galaxy(name.upper())
     d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
     
+    
+    
     # Rotation Curves
-    if name=='NGC1672':
-        fname = "phangsdata/NGC1672_co21_12m+7m+tp_RC.txt"
-        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
-        R, vrot = np.loadtxt(fname,skiprows=True,unpack=True)
-        # R = Radius from center of galaxy, in arcsec.
-        # vrot = Rotational velocity, in km/s.
-    elif name=='M33':
-        m33 = pd.read_csv('phangsdata/m33_rad.out_fixed.csv')
+    if name=='m33':
+        m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
         R = m33['r']
         vrot = m33['Vt']
-    # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
+    else:
+        fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC.txt"
+        R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+        # R = Radius from center of galaxy, in arcsec.
+        # vrot = Rotational velocity, in km/s.
+    # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are 
+    #     treated as unitless!
     
     # Adding a (0,0) data point to rotation curve
     if R[0]!=0:
@@ -72,7 +74,7 @@ def rotcurve(name,smooth='False',knots=8):
     
     # Units & conversions
     R = R*u.arcsec
-    vrot = vrot*u.km/u.s    
+    vrot = vrot*u.km/u.s
     R = R.to(u.rad)            # Radius, in radians.
     R = (R*d).value            # Radius, in pc, but treated as unitless.
     
@@ -101,7 +103,6 @@ def rotcurve(name,smooth='False',knots=8):
         return R, vrot_s, k
     else:
         return R, vrot, k
-
 
 def rotmap(name):
     '''
@@ -140,11 +141,10 @@ def rotmap(name):
 
 
     # Header
-    if name=='NGC1672':
-        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
-    elif name=='M33':
-        hdr = fits.getheader('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
-
+    if name.upper()=='M33':
+        hdr = fits.getheader('notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+    else:
+        hdr = fits.getheader('phangsdata/'+name.lower()+'_co21_12m+7m+tp_mom0.fits')
     # vrot Interpolation
     R_1d, vrot, k_discard = rotcurve(name,smooth=0)  # Creates "vrot" interpolation function, and 1D array of R.
 
@@ -169,7 +169,6 @@ def rotmap(name):
     vobs = (vsys.value + vrot(R)*np.sin(I)*np.cos( np.arctan2(Y,X) )) * (u.km/u.s)
     
     return vobs, R, Dec, RA
-
 
 def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     '''
@@ -254,7 +253,7 @@ def localshear(name,knots=8):
     
     return A
 
-def linewidth_iso(name,knots=8):
+def linewidth_iso(name,beam,knots=8):
     '''
     Returns the effective LoS velocity dispersion
     due to the galaxy's rotation, sigma_gal, for
@@ -264,6 +263,8 @@ def linewidth_iso(name,knots=8):
     -----------
     name : str
         Name of the galaxy in question.
+    beam : float
+        Beam width, in deg.
     knots : int
         Number of INTERNAL knots in BSpline
         representation of rotation curve, which
@@ -278,29 +279,11 @@ def linewidth_iso(name,knots=8):
         Interpolation function for sigma_gal that
         works over R.
     '''
-    gal = Galaxy(name)
-    
-    # Beam
-    if name.upper()=='NGC1672':
-        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
-    elif name.upper()=='M33':
-        hdr = fits.getheader\
-            ('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
-            # WARNING: The IRAM .fits files give headers that galaxies.py misinterprets somehow,
-            #    causing the galaxy to appear weirdly warped and lopsided.
-            # WARNING: The peakvels.fits gives accurate data, but does not contain beam information.
-            #    The IRAM .fits files contain beam information which should be interpreted correctly.
-        hdr_beam = fits.getheader\
-            ('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')  # We're just using this one for the beam.
+    gal = Galaxy(name.upper())
     
     # Beam width
-    if name.upper()=='M33':
-        # This is just because M33 needs one .fits files for headers to be properly interpreted, and another
-        #    to provide beam information.
-        beam = hdr_beam['BMAJ']*u.deg
-    else:
-        beam = hdr['BMAJ']*u.deg                     # Beam size, in degrees   
-    beam = beam.to(u.rad)                       # Beam size, in radians
+  
+    beam = beam*u.deg.to(u.rad)                 # Beam size, in radians
     d = (gal.distance).to(u.pc)
     Rc = beam*d / u.rad                         # Beam size, in parsecs
     
@@ -325,58 +308,41 @@ def linewidth_iso(name,knots=8):
     
     return R, sigma_gal
 
-def moments(name,mode=''):
+def moments(name,hdr,beam,I_mom0,I_mom1,I_tpeak,mode=''):
     '''
-    Returns things like 'sigma' or 'Sigma' for
-    a galaxy where the moment maps are provided.
-    Basically, just the Warmup.py stuff.
+    Returns things like 'sigma' (line width, in km/s)
+    or 'Sigma' (surface density) for a galaxy. The
+    header, beam, and moment maps must be provided.
     
     Parameters:
     -----------
     name : str
         Name of the galaxy in question.
-    mode : str
-        mode=='beam' : returns beam size, in pc.
-        mode=='sigma': returns rad,sigma.
-        mode=='Sigma': returns rad,Sigma.
+    hdr : astropy.io.fits.header.Header
+        Header for the galaxy.
+    beam : float
+        Beam width, in deg.
+    I_mom0 : np.ndarray
+        0th moment, in K km/s.
+    I_mom1 : np.ndarray
+        Velocity, in km/s.
+    I_tpeak : np.ndarray
+        Peak temperature, in K.
 
     Returns:
     --------
     R : np.ndarray
         Radius array.
-    sigma_gal : scipy.interpolate._bsplines.BSpline
-        Interpolation function for sigma_gal that
-        works over R.
+    (s/S)igma : np.ndarray
+        Maps for line width and surface density,
+        respectively.
     '''
-    # Warmup.py stuff, originally for NGC1672.
 
-    # Initializing
-    if name.upper()=='NGC1672':
-        hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
-        I_mom0 = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')  # In K km/s.
-        I_mom1 = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_mom1.fits') 
-        I_max = fits.getdata('phangsdata/ngc1672_co21_12m+7m+tp_tpeak.fits')  # Peak temperature, in K.
-    elif name.upper()=='M33':
-        hdr = fits.getheader\
-            ('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
-            # WARNING: The IRAM .fits files give headers that galaxies.py misinterprets somehow,
-            #    causing the galaxy to appear weirdly warped and lopsided.
-            # WARNING: The peakvels.fits gives accurate data, but does not contain beam information.
-            #    The IRAM .fits files contain beam information which should be interpreted correctly.
-        hdr_beam = fits.getheader\
-            ('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')  # We're just using this one for the beam.
-        I_mom0 = fits.getdata('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')/1000. # Now in K km/s.
-        I_mom1 = fits.getdata(\
-                'phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
-        I_max = fits.getdata('notphangsdata/m33.co21_iram.14B-088_HI.peaktemps.fits')   # Peak T, in K.
-    gal = Galaxy(name)
+    gal = Galaxy(name.upper())
     rad = gal.radius(header=hdr)
     rad = rad.to(u.pc)                                      # Converts rad from Mpc to pc.
     d = gal.distance
     d = d.to(u.pc)                                          # Converts d from Mpc to pc.
-
-        
-    
 
     # Pixel sizes
     pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))*u.deg # The size of each pixel, in degrees. 
@@ -389,27 +355,15 @@ def moments(name,mode=''):
     pcperdeg = pcperpixel / pixsizes_deg[0]
     print "There are +"+str(pcperdeg)+"."
 
-    # Beam width
-    if name.upper()=='M33':
-        # This is just because M33 needs one .fits files for headers to be properly interpreted, and another
-        #    to provide beam information.
-        beam = hdr_beam['BMAJ']
-    else:
-        beam = hdr['BMAJ']                                  # Beam size, in degrees
+    # Beam
     beam = beam * pcperdeg                                  # Beam size, in pc
 
-    # Gradient of mom1
-    gradv = ndimage.sobel(I_mom1/pcperpixel)              # Sobel gradient of I_mom1; = grad(mean velocity), in km/s/pc
-    gradvl = ndimage.sobel(I_mom1 * beam / pcperpixel)    # Sobel gradient of I_mom1 * beam width, in km/s
-
     # Line width, Surface density
-    alpha = 6.7
-    sigma = I_mom0 / (np.sqrt(2*np.pi * I_max))
-    Sigma = alpha*I_mom0
+    alpha = 6.7  # (???) Units: (Msun pc^-2) / (K km s^-1)
+    sigma = I_mom0 / (np.sqrt(2*np.pi) * I_tpeak)
+    Sigma = alpha*I_mom0   # (???) Units: Msun pc^-2
     
-    if mode=='beam':
-        return beam
-    elif mode=='sigma':
+    if mode=='sigma':
         return rad, sigma
     elif mode=='Sigma':
         return rad, Sigma

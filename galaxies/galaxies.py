@@ -136,13 +136,16 @@ class Galaxy(object):
                 self.velocity = 411.3 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
+		self.name = 'NGC1672'
         	self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
                 #self.position_angle = Angle(170 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC4535':
+		self.name = 'NGC4535'
                 self.position_angle = Angle(0 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC5068':
+		self.name = 'NGC5068'
                 self.position_angle = Angle(110 * u.deg)
                 self.provenance = 'Override'
 #            else:
@@ -227,8 +230,6 @@ class Galaxy(object):
 
         Parameters:
         -----------
-        name : str
-            Name of the galaxy that we care about.
 	smooth : bool
 	    Determines whether the returned rotation
 	    curve returned is smoothed or not.
@@ -253,16 +254,15 @@ class Galaxy(object):
         d = (self.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
 
         # Rotation Curves
-        if self.name.upper()=='NGC1672':
-            fname = "phangsdata/NGC1672_co21_12m+7m+tp_RC.txt"
-            hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
-            R, vrot = np.loadtxt(fname,skiprows=True,unpack=True)
-            # R = Radius from center of galaxy, in arcsec.
-            # vrot = Rotational velocity, in km/s.
-        elif self.name.upper()=='M33':
-            m33 = pd.read_csv('phangsdata/m33_rad.out_fixed.csv')
+        if self.name.upper()=='M33':
+            m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
             R = m33['r']					# Rotation curve, in arcsecs.
             vrot = m33['Vt']
+        else:
+            fname = "phangsdata/"+self.name.lower()+"_co21_12m+7m+tp_RC.txt"
+            R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+            # R = Radius from center of galaxy, in arcsec.
+            # vrot = Rotational velocity, in km/s.
         # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
 
         # Adding a (0,0) data point to rotation curve
@@ -351,12 +351,6 @@ class Galaxy(object):
         Returns "observed velocity" map, and "rotation
         map". (The latter is just to make sure that the
         code is working properly.)
-        WARNING: Only works for NGC1672 at the moment.
-
-        Parameters:
-        -----------
-        name : str
-            Name of the galaxy that we care about.
 
         Returns:
         --------
@@ -378,15 +372,15 @@ class Galaxy(object):
         Dec_cen = self.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees
         PA = (self.position_angle / u.deg * u.deg)        # Position angle (angle from N to line of nodes)
                                                          # NOTE: The x-direction is defined as the LoN.
-        d = (self.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
+        d = (self.distance).to(u.parsec)                 # Distance to galaxy, from Mpc to pc
         
 
         # Header
-        if self.name.upper()=='NGC1672':
-            hdr = fits.getheader('phangsdata/ngc1672_co21_12m+7m+tp_mom0.fits')
-        elif self.name.upper()=='M33':
-            hdr = fits.getheader\
-            ('phangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+        if self.name.upper()=='M33':
+            hdr = fits.getheader(\
+	    'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+        else:
+            hdr = fits.getheader('phangsdata/'+self.name.lower()+'_co21_12m+7m+tp_mom0.fits')
 
         # vrot Interpolation
         R_1d, vrot, k_discard = self.rotcurve(self)    # Creates "vrot" interpolation function,
