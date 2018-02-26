@@ -137,7 +137,9 @@ class Galaxy(object):
                 self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
 		self.name = 'NGC1672'
-        	self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
+		self.position_angle = Angle(141.9 * u.deg) # Phillipp's version
+		self.inclination = Angle(24.7 * u.deg) # Phillipp's version
+        	#self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
                 #self.position_angle = Angle(170 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC4535':

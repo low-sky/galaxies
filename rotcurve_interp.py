@@ -302,7 +302,7 @@ def linewidth_iso(name,beam,knots=8):
     
     return R, sigma_gal
 
-def moments(name,hdr,beam,I_mom0,I_mom1,I_tpeak,mode=''):
+def moments(name,hdr,beam,I_mom0,I_tpeak,mode=''):
     '''
     Returns things like 'sigma' (line width, in km/s)
     or 'Sigma' (surface density) for a galaxy. The
@@ -318,8 +318,6 @@ def moments(name,hdr,beam,I_mom0,I_mom1,I_tpeak,mode=''):
         Beam width, in deg.
     I_mom0 : np.ndarray
         0th moment, in K km/s.
-    I_mom1 : np.ndarray
-        Velocity, in km/s.
     I_tpeak : np.ndarray
         Peak temperature, in K.
 
