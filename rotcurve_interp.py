@@ -22,7 +22,6 @@ def rotcurve(name,smooth='False',knots=8):
     returns interpolator functions for rotational
     velocity vs radius, and epicyclic frequency vs
     radius.
-    WARNING: Only for NGC1672 and M33 at the moment.
     
     Parameters:
     -----------
@@ -42,7 +41,7 @@ def rotcurve(name,smooth='False',knots=8):
         1D array of radii of galaxy, in pc.
     vrot : scipy.interpolate._bsplines.BSpline
         Function for the interpolated rotation
-        curve.
+        curve, in km/s.
     k : scipy.interpolate.interp1d
         Function for the interpolated epicyclic
         frequency.
@@ -62,6 +61,8 @@ def rotcurve(name,smooth='False',knots=8):
     else:
         fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC.txt"
         R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+#         fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC_OLD.txt"
+#         R, vrot = np.loadtxt(fname,skiprows=True,unpack=True)
         # R = Radius from center of galaxy, in arcsec.
         # vrot = Rotational velocity, in km/s.
     # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are 
@@ -232,7 +233,7 @@ def localshear(name,knots=8):
     --------
     A : scipy.interpolate._bsplines.BSpline
         Oort A "constant", as a function of 
-        radius R.
+        radius R, in km/s/kpc.
     '''
     gal = Galaxy(name)
     
@@ -242,7 +243,7 @@ def localshear(name,knots=8):
     # Oort A constant.
     Omega = vrot(R) / R     # Angular velocity.
     dOmegadR = np.gradient(Omega,R)
-    A = -1./2. * R*dOmegadR
+    A = (-1./2. * R*dOmegadR )*(u.kpc.to(u.pc)) # From km/s/pc to km/s/kpc.
     A = bspline(R[np.isfinite(A)],A[np.isfinite(A)],knots=999)
     
     return A

@@ -8,6 +8,7 @@ from astropy.wcs import WCS
 from astropy.table import Table
 from astropy.convolution import convolve_fft, Gaussian2DKernel
 from spectral_cube import SpectralCube, Projection
+from radio_beam import Beam
 from galaxies import Galaxy
 
 import copy
@@ -90,8 +91,7 @@ def info(name,conbeam=None):
            
     # Spectral Cube
     if name=='m33':
-        cube = None
-        print "M33 doesn't have a cube available."
+        cube = SpectralCube.read('notphangsdata/'+name+'.co21_iram.fits')
     else:
         cube = SpectralCube.read('phangsdata/'+name+'_co21_12m+7m+tp_flat_round_k.fits')
         
@@ -103,7 +103,7 @@ def info(name,conbeam=None):
         sfr = convolve_sfr(name,hdr,sfr,conbeam)                  # Convolved SFR map.
     else:
         sfr = sfr.value
-    
+
     return hdr,beam,I_mom0,I_mom1,I_tpeak,cube,sfr
 
 def cube_moments(name,conbeam):
@@ -133,24 +133,50 @@ def cube_moments(name,conbeam):
         convolved to the resolution indicated
         by "conbeam".
     '''
+    resolutions = np.array([60,80,100,120,500,750,1000])*u.pc   # Available pre-convolved resolutions,
+                                                                #    in PHANGS-ALMA-v1p0
     if conbeam.unit in {u.pc, u.kpc, u.Mpc}:
-        conbeam_filename = str(conbeam.to(u.pc).value)+'pc'
+        if conbeam not in resolutions:       # Setting conbeam_filename to use int, for pre-convolved maps
+            conbeam_filename = str(conbeam.to(u.pc).value)+'pc'
+        else:
+            conbeam_filename = str(int(conbeam.to(u.pc).value))+'pc'
     elif conbeam.unit in {u.arcsec, u.arcmin, u.deg, u.rad}:
         conbeam_filename = str(conbeam.to(u.arcsec).value)+'arcsec'
     else:
         raise ValueError("'conbeam' must have units of pc or arcsec.")
         
     # Read cube
-    filename = 'phangsdata/cube_convolved/'+name.lower()+'_co21_12m+7m+tp_flat_round_k_'+conbeam_filename+'.fits'
-    if os.path.isfile(filename):
-        cubec = SpectralCube.read(filename)
+    if conbeam not in resolutions:
+        if name.lower()=='m33':
+            filename = 'notphangsdata/cube_convolved/'+name.lower()+'.co21_iram_'+conbeam_filename+'.fits'
+        else:
+            filename = 'phangsdata/cube_convolved/'+name.lower()+'_co21_12m+7m+tp_flat_round_k_'+conbeam_filename+'.fits'
+        if os.path.isfile(filename):
+            cubec = SpectralCube.read(filename)
+            cubec.allow_huge_operations=True
+        else:
+            raise ValueError(filename+' does not exist.')
+        if name.lower()=='m33':
+            # M33's cube is bugged to drop the K unit.
+            I_mom0c = cubec.moment0().to(u.km/u.s) * u.K
+            I_tpeakc = cubec.max(axis=0) * u.K
+        else:
+            I_mom0c = cubec.moment0().to(u.K*u.km/u.s)
+            I_tpeakc = cubec.max(axis=0).to(u.K)
+        hdrc = I_mom0c.header
     else:
-        raise ValueError(filename+' does not exist.')
-    cubec.allow_huge_operations=True
-    I_mom0c = cubec.moment0().to(u.K*u.km/u.s)
-    I_tpeakc = cubec.max(axis=0).to(u.K)
-    hdrc = I_mom0c.header
-    
+        I_mom0c  = fits.getdata('phangsdata/'+name.lower()+'_co21_12m+7m+tp_mom0_'+conbeam_filename+'.fits')*u.K*u.km/u.s
+        I_tpeakc = fits.getdata('phangsdata/'+name.lower()+'_co21_12m+7m+tp_tpeak_'+conbeam_filename+'.fits')*u.K
+        filename = 'phangsdata/'+name.lower()+'_co21_12m+7m+tp_flat_round_k_'+conbeam_filename+'.fits'
+        if os.path.isfile(filename):
+            cubec = SpectralCube.read(filename)
+            cubec.allow_huge_operations=True
+        else:
+            raise ValueError(filename+' does not exist.')
+        print "WARNING: This uses a pre-convolved .fits file from Drive."
+        I_mom0c_DUMMY = cubec.moment0().to(u.K*u.km/u.s)
+        hdrc = I_mom0c_DUMMY.header
+        
     return hdrc,I_mom0c.value, I_tpeakc.value, cubec
 
 def convolve_sfr(name,hdr,map2d,conbeam):
@@ -180,9 +206,9 @@ def convolve_sfr(name,hdr,map2d,conbeam):
     '''
     gal = Galaxy(name.upper())
     if conbeam.unit in {u.pc, u.kpc, u.Mpc}:
-        conbeam_width = conbeam.to(u.pc) / np.sqrt(8.*np.log(2))   # Beam width in pc.
+        conbeam_width = conbeam.to(u.pc) # Beam width in pc.
         conbeam_angle = conbeam / gal.distance.to(u.pc) * u.rad
-        conbeam_angle = conbeam_angle.to(u.deg)
+        conbeam_angle = conbeam_angle.to(u.deg) / np.sqrt(8.*np.log(2)) 
     elif conbeam.unit in {u.arcsec, u.arcmin, u.deg, u.rad}:
         conbeam_angle = conbeam.to(u.deg) / np.sqrt(8.*np.log(2))
     else:
