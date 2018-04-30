@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-from scipy import ndimage, misc, interpolate
+from scipy import ndimage, misc, interpolate, optimize
 from scipy.interpolate import BSpline, make_lsq_spline
 
 import astropy.io.fits as fits
@@ -16,7 +16,7 @@ import pandas as pd
 import statsmodels.formula.api as smf
 
 
-def rotcurve(name,smooth='False',knots=8):
+def rotcurve(name,smooth='spline',knots=8):
     '''
     Reads a provided rotation curve table and
     returns interpolator functions for rotational
@@ -27,9 +27,12 @@ def rotcurve(name,smooth='False',knots=8):
     -----------
     name : str
         Name of the galaxy that we care about.
-    smooth : bool
-        Determines whether the returned rotation
-        curve returned is smoothed or not.
+    smooth : str
+        Determines smoothing for rotation curve.
+        Available modes:
+        'none'   (not recommended)
+        'spline' (DEFAULT; uses specified # of knots)
+        'brandt' (the analytical model)
     knots : int
         Number of internal knots in BSpline of
         vrot, which is used to calculate epicyclic
@@ -58,6 +61,8 @@ def rotcurve(name,smooth='False',knots=8):
         m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
         R = m33['r']
         vrot = m33['Vt']
+        vrot_e = None
+        print "WARNING: M33 rotcurve error bars not accounted for!"
     else:
         fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC.txt"
         R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
@@ -68,20 +73,21 @@ def rotcurve(name,smooth='False',knots=8):
     # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are 
     #     treated as unitless!
     
-    # Adding a (0,0) data point to rotation curve
-    if R[0]!=0:
-        R = np.roll(np.concatenate((R,[0]),0),1)
-        vrot = np.roll(np.concatenate((vrot,[0]),0),1)
-    
     # Units & conversions
     R = R*u.arcsec
     vrot = vrot*u.km/u.s
     R = R.to(u.rad)            # Radius, in radians.
     R = (R*d).value            # Radius, in pc, but treated as unitless.
+    R_e = np.copy(R)           # Radius, corresponding to error bars.
+    
+    # Adding a (0,0) data point to rotation curve
+    if R[0]!=0:
+        R = np.roll(np.concatenate((R,[0]),0),1)
+        vrot = np.roll(np.concatenate((vrot,[0]),0),1)
     
     
     
-    # BSpline of vrot(R)
+    # BSpline interpolation of vrot(R)
     K=3                # Order of the BSpline
     t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
     vrot = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
@@ -90,20 +96,43 @@ def rotcurve(name,smooth='False',knots=8):
     Nsteps = 10000
     R = np.linspace(R.min(),R.max(),Nsteps)
     
-    # SMOOTH BSpline of vrot(R)
-    vrot_s = bspline(R,vrot(R),knots=knots,lowclamp=True)
+    # SMOOTHING:
+    if smooth==None or smooth.lower()=='none':
+        print "WARNING: Smoothing disabled!"
+    elif smooth.lower()=='spline':
+        # BSpline of vrot(R)
+        vrot = bspline(R,vrot(R),knots=knots,lowclamp=True)
+    elif smooth.lower()=='brandt':
+        def vcirc_brandt(r, *pars):
+            '''
+            Fit Eq. 5 from Meidt+08 (Eq. 1 Faber & Gallagher 79).
+            This is taken right out of Eric Koch's code.
+            '''
+            n, vmax, rmax = pars
+            numer = vmax * (r / rmax)
+            denom = np.power((1 / 3.) + (2 / 3.) *\
+                    np.power(r / rmax, n), (3 / (2 * n)))
+            return numer / denom
+        params, params_covariance = scipy.optimize.curve_fit(\
+                                        vcirc_brandt,R_e,vrot(R_e),p0=(1,1,1),sigma=vrot_e,\
+                                        bounds=((0.5,0,0),(np.inf,np.inf,np.inf)))
+        print "n,vmax,rmax = "+str(params)
+        vrot_b = vcirc_brandt(R,params[0],params[1],params[2])  # Array.
+
+        # BSpline interpolation of vrot_s(R)
+        K=3                # Order of the BSpline
+        t,c,k = interpolate.splrep(R,vrot_b,s=0,k=K)
+        vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
 
     
     # Epicyclic Frequency
-    dVdR = np.gradient(vrot_s(R),R)
-    k2 =  2.*(vrot_s(R)**2 / R**2 + vrot_s(R)/R*dVdR)
+    dVdR = np.gradient(vrot(R),R)
+    k2 =  2.*(vrot(R)**2 / R**2 + vrot(R)/R*dVdR)
     k = interpolate.interp1d(R,np.sqrt(k2))
     
     
-    if smooth==True:
-        return R, vrot_s, k
-    else:
-        return R, vrot, k
+    return R, vrot, R_e, vrot_e, k     # NOTE: Here, 'vrot' may or may not be smoothed.
+    
 
 def rotmap(name,header=None):
     '''
@@ -141,7 +170,7 @@ def rotmap(name,header=None):
     d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
 
     # vrot Interpolation
-    R_1d, vrot, k_discard = rotcurve(name,smooth=0)  # Creates "vrot" interpolation function, and 1D array of R.
+    R_1d, vrot, R_e, vrot_e, k_discard = rotcurve(name,smooth=None)  # Creates "vrot" interpolation function, and 1D array of R.
 
 
     # Generating displayable grids
@@ -238,7 +267,7 @@ def localshear(name,knots=8):
     gal = Galaxy(name)
     
     # Use "interp" to generate R, vrot (smoothed).
-    R, vrot, k_discard = gal.rotcurve(smooth=True, knots=knots)
+    R, vrot, R_e, vrot_e, k_discard = gal.rotcurve(smooth='spline', knots=knots)
     
     # Oort A constant.
     Omega = vrot(R) / R     # Angular velocity.
@@ -283,7 +312,7 @@ def linewidth_iso(name,beam,knots=8):
     Rc = beam*d / u.rad                         # Beam size, in parsecs
     
     # Use "interp" to generate R, vrot (smoothed), k.
-    R, vrot, k = gal.rotcurve(smooth=1,knots=knots)
+    R, vrot, R_e, vrot_e, k = gal.rotcurve(smooth='spline',knots=knots)
     
     # Calculate sigma_gal = kappa*Rc
     sigma_gal = k(R)*Rc
@@ -341,12 +370,12 @@ def moments(name,hdr,beam,I_mom0,I_tpeak,mode=''):
     pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))*u.deg # The size of each pixel, in degrees. 
                                                                          # Ignore that third dimension; that's 
                                                                          # pixel size for the speed.
-    print "Pixel size, in degrees = "+str(pixsizes_deg[0])
+    #print "Pixel size, in degrees = "+str(pixsizes_deg[0])
     pixsizes = pixsizes_deg[0].to(u.rad)                    # Pixel size, in radians.
     pcperpixel =  pixsizes.value*d                          # Number of parsecs per pixel.
-    print "Pixel size, in parsecs = "+str(pcperpixel)
+    #print "Pixel size, in parsecs = "+str(pcperpixel)
     pcperdeg = pcperpixel / pixsizes_deg[0]
-    print "There are +"+str(pcperdeg)+"."
+    #print "There are +"+str(pcperdeg)+"."
 
     # Beam
     beam = beam * pcperdeg                                  # Beam size, in pc

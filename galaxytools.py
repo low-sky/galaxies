@@ -100,7 +100,7 @@ def info(name,conbeam=None):
     if conbeam!=None:
         hdr,I_mom0, I_tpeak, cube = cube_moments(name,conbeam)    # Convolved moments, with their cube.
         sfr = sfr.reproject(hdr)                                  # The new header might have different res.!
-        sfr = convolve_sfr(name,hdr,sfr,conbeam)                  # Convolved SFR map.
+        sfr = convolve_2D(name,hdr,sfr,conbeam)                  # Convolved SFR map.
     else:
         sfr = sfr.value
 
@@ -109,7 +109,10 @@ def info(name,conbeam=None):
 def cube_moments(name,conbeam):
     '''
     Extracts the mom0 and tpeak maps from
-    a convolved data cube.
+        a convolved data cube.
+    If pre-convolved mom0/tpeak/cube data
+        already exists on the PHANGs Drive,
+        then they will be used instead.
     
     Parameters:
     -----------
@@ -135,16 +138,17 @@ def cube_moments(name,conbeam):
     '''
     resolutions = np.array([60,80,100,120,500,750,1000])*u.pc   # Available pre-convolved resolutions,
                                                                 #    in PHANGS-ALMA-v1p0
+    # Units for convolution beamwidth:
     if conbeam.unit in {u.pc, u.kpc, u.Mpc}:
-        if conbeam not in resolutions:       # Setting conbeam_filename to use int, for pre-convolved maps
+        if conbeam not in resolutions:
             conbeam_filename = str(conbeam.to(u.pc).value)+'pc'
-        else:
+        else:                            # Setting conbeam_filename to use int, for pre-convolved maps
             conbeam_filename = str(int(conbeam.to(u.pc).value))+'pc'
     elif conbeam.unit in {u.arcsec, u.arcmin, u.deg, u.rad}:
         conbeam_filename = str(conbeam.to(u.arcsec).value)+'arcsec'
     else:
         raise ValueError("'conbeam' must have units of pc or arcsec.")
-        
+    
     # Read cube
     if conbeam not in resolutions:
         if name.lower()=='m33':
@@ -164,7 +168,7 @@ def cube_moments(name,conbeam):
             I_mom0c = cubec.moment0().to(u.K*u.km/u.s)
             I_tpeakc = cubec.max(axis=0).to(u.K)
         hdrc = I_mom0c.header
-    else:
+    else:    # If pre-convolved 3D data (mom0, tpeak, cube) exist:
         I_mom0c  = fits.getdata('phangsdata/'+name.lower()+'_co21_12m+7m+tp_mom0_'+conbeam_filename+'.fits')*u.K*u.km/u.s
         I_tpeakc = fits.getdata('phangsdata/'+name.lower()+'_co21_12m+7m+tp_tpeak_'+conbeam_filename+'.fits')*u.K
         filename = 'phangsdata/'+name.lower()+'_co21_12m+7m+tp_flat_round_k_'+conbeam_filename+'.fits'
@@ -173,16 +177,16 @@ def cube_moments(name,conbeam):
             cubec.allow_huge_operations=True
         else:
             raise ValueError(filename+' does not exist.')
-        print "WARNING: This uses a pre-convolved .fits file from Drive."
+        print "IMPORTANT NOTE: This uses pre-convolved .fits files from Drive."
         I_mom0c_DUMMY = cubec.moment0().to(u.K*u.km/u.s)
         hdrc = I_mom0c_DUMMY.header
         
     return hdrc,I_mom0c.value, I_tpeakc.value, cubec
 
-def convolve_sfr(name,hdr,map2d,conbeam):
+def convolve_2D(name,hdr,map2d,conbeam):
     '''
-    Returns SFR map, convolved to a beam
-    width "beam".
+    Returns 2D map (e.g. SFR), convolved 
+    to a beam width "conbeam".
     
     Parameters:
     -----------
@@ -206,11 +210,13 @@ def convolve_sfr(name,hdr,map2d,conbeam):
     '''
     gal = Galaxy(name.upper())
     if conbeam.unit in {u.pc, u.kpc, u.Mpc}:
-        conbeam_width = conbeam.to(u.pc) # Beam width in pc.
-        conbeam_angle = conbeam / gal.distance.to(u.pc) * u.rad
-        conbeam_angle = conbeam_angle.to(u.deg) / np.sqrt(8.*np.log(2)) 
+        conbeam_width = conbeam.to(u.pc)                         # Beam width, in pc.
+        conbeam_angle = conbeam / gal.distance.to(u.pc) * u.rad  # Beam width, in radians.
+        conbeam_angle = conbeam_angle.to(u.deg) / np.sqrt(8.*np.log(2)) # ..., in degrees, now as an
+                                                                        #   actual Gaussian stdev.
     elif conbeam.unit in {u.arcsec, u.arcmin, u.deg, u.rad}:
-        conbeam_angle = conbeam.to(u.deg) / np.sqrt(8.*np.log(2))
+        conbeam_angle = conbeam.to(u.deg) / np.sqrt(8.*np.log(2))# Beam width, in degrees, now as an
+                                                                 #          actual Gaussian stdev.
     else:
         raise ValueError("'conbeam' must have units of pc or arcsec.")
     
@@ -219,9 +225,8 @@ def convolve_sfr(name,hdr,map2d,conbeam):
     
     pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))[0]*u.deg # The size of each pixel, in deg.
     conbeam_pixwidth = conbeam_angle / pixsizes_deg  # Beam width, in pixels.
-    print "Pixel width of beam: "+str(conbeam_pixwidth)+" pixels."
+#     print "Pixel width of beam: "+str(conbeam_pixwidth)+" pixels."
     
-    #gauss = gaussian(beam_pixwidth)
     gauss = Gaussian2DKernel(conbeam_pixwidth)
     map2d_convolved = convolve_fft(map2d,gauss,normalize_kernel=True)
     return map2d_convolved
@@ -267,7 +272,10 @@ def convolve_cube(gal,cube,conbeam):
     cube = cube.convolve_to(bm)
     
     # Never convolve the cube again!
-    filename = 'phangsdata/cube_convolved/'+name.lower()+'_co21_12m+7m+tp_flat_round_k_'+conbeam_filename+'.fits'
+    if gal.name=='M33':
+        filename = 'notphangsdata/cube_convolved/'+name.lower()+'.co21_iram_'+conbeam_filename+'.fits'
+    else:
+        filename = 'phangsdata/cube_convolved/'+name.lower()+'_co21_12m+7m+tp_flat_round_k_'+conbeam_filename+'.fits'
     print filename
     if os.path.isfile(filename):
         os.remove(filename)
