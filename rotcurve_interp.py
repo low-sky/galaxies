@@ -243,7 +243,7 @@ def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     
     return spl
 
-def localshear(name,knots=8):
+def localshear(name,smooth='spline',knots=8):
     '''
     Returns the local shear parameter (i.e. the
     Oort A constant) for a galaxy with a provided
@@ -254,6 +254,12 @@ def localshear(name,knots=8):
     -----------
     name : str
         Name of the galaxy in question.
+    smooth : str
+        Determines smoothing for rotation curve.
+        Available modes:
+        'none'   (not recommended)
+        'spline' (DEFAULT; uses specified # of knots)
+        'brandt' (the analytical model)
     knots : int
         Number of INTERNAL knots in BSpline
         representation of rotation curve.
@@ -267,7 +273,7 @@ def localshear(name,knots=8):
     gal = Galaxy(name)
     
     # Use "interp" to generate R, vrot (smoothed).
-    R, vrot, R_e, vrot_e, k_discard = gal.rotcurve(smooth='spline', knots=knots)
+    R, vrot, R_e, vrot_e, k_discard = gal.rotcurve(smooth=smooth, knots=knots)
     
     # Oort A constant.
     Omega = vrot(R) / R     # Angular velocity.

@@ -279,9 +279,9 @@ class Galaxy(object):
         R_e = np.copy(R)           # Radius, corresponding to error bars.
 
         # Adding a (0,0) data point to rotation curve
-        if R[0]!=0:
-            R = np.roll(np.concatenate((R,[0]),0),1)
-            vrot = np.roll(np.concatenate((vrot,[0]),0),1)
+#        if R[0]!=0:
+#            R = np.roll(np.concatenate((R,[0]),0),1)
+#            vrot = np.roll(np.concatenate((vrot,[0]),0),1)
 
         def bspline(X,Y,knots,k=3,lowclamp=False, highclamp=False):
             '''
@@ -334,7 +334,7 @@ class Galaxy(object):
         # BSpline interpolation of vrot(R)
         K=3                # Order of the BSpline
         t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
-        vrot = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
+        vrot = interpolate.BSpline(t,c,k, extrapolate=False)     # Cubic interpolation of vrot(R).
                                                                 # 'vrot' is now a function, not an array.
         # Creating "higher-resolution" rotation curve
         Nsteps = 10000
@@ -366,7 +366,7 @@ class Galaxy(object):
             # BSpline interpolation of vrot_s(R)
             K=3                # Order of the BSpline
             t,c,k = interpolate.splrep(R,vrot_b,s=0,k=K)
-            vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
+            vrot = interpolate.BSpline(t,c,k, extrapolate=False)  # Now it's a function.
 
         # Epicyclic Frequency
         dVdR = np.gradient(vrot(R),R)
