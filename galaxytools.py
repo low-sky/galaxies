@@ -9,7 +9,11 @@ from astropy.table import Table
 from astropy.convolution import convolve_fft, Gaussian2DKernel
 from spectral_cube import SpectralCube, Projection
 from radio_beam import Beam
+
+from scipy import interpolate
+
 from galaxies import Galaxy
+import rotcurve_interp as rc
 
 import copy
 import os
@@ -105,6 +109,89 @@ def info(name,conbeam=None):
         sfr = sfr.value
 
     return hdr,beam,I_mom0,I_mom1,I_tpeak,cube,sfr
+    
+def beta_and_depletion(R,rad,Sigma,sfr,vrot_s):
+    '''
+    Returns depletion time, in years,
+        and beta parameter (the index 
+        you would get if the rotation 
+        curve were a power function of 
+        radius, e.g. vrot ~ R**(beta).
+    
+    Parameters:
+    -----------
+    R : np.ndarray
+        1D array of galaxy radii, in pc.
+    rad : np.ndarray
+        2D map of galaxy radii, in pc.
+    Sigma : np.ndarray
+        Map for surface density.
+    sfr : np.ndarray
+        2D map of the SFR, in Msun/kpc^2/yr.
+    vrot_s : scipy.interpolate._bsplines.BSpline
+        Function for the interpolated rotation
+        curve, in km/s. Ideally smoothed.
+        
+    Returns:
+    --------
+    beta : np.ndarray
+        2D map of beta parameter.
+    depletion : np.ndarray
+        2D map of depletion time, in yr.
+    '''
+    # Calculating depletion time
+    # Sigma is in Msun / pc^2.
+    # SFR is in Msun / kpc^2 / yr.
+    depletion = Sigma/(u.pc.to(u.kpc))**2/sfr
+    
+    
+    # Calculating beta
+    dVdR = np.gradient(vrot_s(R),R)   # derivative of rotation curve;
+    # Interpolating a 2D Array
+    K=3                # Order of the BSpline
+    t,c,k = interpolate.splrep(R,dVdR,s=0,k=K)
+    dVdR = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of dVdR
+    beta = rad.value/vrot_s(rad) * dVdR(rad)
+    depletion = Sigma/(u.pc.to(u.kpc))**2/sfr
+    
+    return beta, depletion
+
+def beta_and_depletion_clean(beta,depletion,stride=1):
+    '''
+    Makes beta and depletion time more easily
+        presentable, by removing NaN values,
+        converting to 1D arrays, and skipping
+        numerous points to avoid oversampling.
+    
+    Parameters:
+    -----------
+    beta : np.ndarray
+        2D map of beta parameter.
+    depletion : np.ndarray
+        2D map of depletion time, in yr.
+    stride : int
+        Numer of points to be skipped over.
+    
+    Returns:
+    --------
+    beta : np.ndarray
+        1D array of beta parameter, with nans
+        removed and points skipped.
+    depletion : np.ndarray
+        1D array of depletion time, with nans
+        removed and points skipped.
+    '''
+    # Making them 1D!
+    beta = beta.reshape(beta.size)
+    depletion = depletion.reshape(beta.size)
+    
+    # Cleaning the Depletion/Beta arrays!
+    index = np.arange(beta.size)
+    index = index[ np.isfinite(beta*np.log10(depletion)) ]
+    beta = beta[index][::stride]
+    depletion = depletion[index][::stride]  # No more NaNs or infs!
+    
+    return beta, depletion
 
 def cube_moments(name,conbeam):
     '''
