@@ -367,6 +367,26 @@ class Galaxy(object):
             K=3                # Order of the BSpline
             t,c,k = interpolate.splrep(R,vrot_b,s=0,k=K)
             vrot = interpolate.BSpline(t,c,k, extrapolate=False)  # Now it's a function.
+        elif smooth.lower()=='universal':
+            def vcirc_universal(r, *pars):
+                '''
+                Fit Eq. 14 from Persic & Salucci 1995.
+                '''
+                v0, a, rmax = pars
+                x = (r / rmax)
+                return v0*np.sqrt( (0.72+0.44*np.log10(a))*(1.97*x**1.22)/(x**2 + 0.78**2)**1.43 +
+                           1.6*np.exp(-0.4*a)*x**2/(x**2 + 1.5**2 *a**0.4) )
+                
+            params, params_covariance = optimize.curve_fit(\
+                                            vcirc_universal,R_e,vrot(R_e),p0=(1,1,600),sigma=vrot_e,\
+                                            bounds=((0,0.01,0),(np.inf,np.inf,np.inf)))
+            print "v0,a,rmax = "+str(params)
+            vrot_u = vcirc_universal(R,params[0],params[1],params[2])  # Array.
+
+            # BSpline interpolation of vrot_u(R)
+            K=3                # Order of the BSpline
+            t,c,k = interpolate.splrep(R,vrot_u,s=0,k=K)
+            vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
 
         # Epicyclic Frequency
         dVdR = np.gradient(vrot(R),R)

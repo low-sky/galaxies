@@ -123,7 +123,26 @@ def rotcurve(name,smooth='spline',knots=8):
         K=3                # Order of the BSpline
         t,c,k = interpolate.splrep(R,vrot_b,s=0,k=K)
         vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
+    elif smooth.lower()=='universal':
+        def vcirc_universal(r, *pars):
+            '''
+            Fit Eq. 14 from Persic & Salucci 1995.
+            '''
+            v0, a, rmax = pars
+            x = (r / rmax)
+            return v0*np.sqrt( (0.72+0.44*np.log10(a))*(1.97*x**1.22)/(x**2 + 0.78**2)**1.43 +
+                       1.6*np.exp(-0.4*a)*x**2/(x**2 + 1.5**2 *a**0.4) )
+            
+        params, params_covariance = optimize.curve_fit(\
+                                        vcirc_universal,R_e,vrot(R_e),p0=(1,1,600),sigma=vrot_e,\
+                                        bounds=((0,0.01,0),(np.inf,np.inf,np.inf)))
+        print "v0,a,rmax = "+str(params)
+        vrot_u = vcirc_universal(R,params[0],params[1],params[2])  # Array.
 
+        # BSpline interpolation of vrot_u(R)
+        K=3                # Order of the BSpline
+        t,c,k = interpolate.splrep(R,vrot_u,s=0,k=K)
+        vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
     
     # Epicyclic Frequency
     dVdR = np.gradient(vrot(R),R)
@@ -260,6 +279,7 @@ def localshear(name,smooth='spline',knots=8):
         'none'   (not recommended)
         'spline' (DEFAULT; uses specified # of knots)
         'brandt' (the analytical model)
+        'universal' (Persic & Salucci 1995)
     knots : int
         Number of INTERNAL knots in BSpline
         representation of rotation curve.
@@ -283,7 +303,7 @@ def localshear(name,smooth='spline',knots=8):
     
     return A
 
-def linewidth_iso(name,beam,knots=8):
+def linewidth_iso(name,beam,smooth='spline',knots=8):
     '''
     Returns the effective LoS velocity dispersion
     due to the galaxy's rotation, sigma_gal, for
@@ -295,6 +315,13 @@ def linewidth_iso(name,beam,knots=8):
         Name of the galaxy in question.
     beam : float
         Beam width, in deg.
+    smooth : str
+        Determines smoothing for rotation curve.
+        Available modes:
+        'none'   (not recommended)
+        'spline' (DEFAULT; uses specified # of knots)
+        'brandt' (the analytical model)
+        'universal' (Persic & Salucci 1995)
     knots : int
         Number of INTERNAL knots in BSpline
         representation of rotation curve, which
@@ -318,7 +345,7 @@ def linewidth_iso(name,beam,knots=8):
     Rc = beam*d / u.rad                         # Beam size, in parsecs
     
     # Use "interp" to generate R, vrot (smoothed), k.
-    R, vrot, R_e, vrot_e, k = gal.rotcurve(smooth='spline',knots=knots)
+    R, vrot, R_e, vrot_e, k = gal.rotcurve(smooth=smooth,knots=knots)
     
     # Calculate sigma_gal = kappa*Rc
     sigma_gal = k(R)*Rc
