@@ -156,7 +156,7 @@ def beta_and_depletion(R,rad,Sigma,sfr,vrot_s):
     
     return beta, depletion
 
-def beta_and_depletion_clean(beta,depletion,stride=1):
+def beta_and_depletion_clean(beta,depletion,rad=None,stride=1):
     '''
     Makes beta and depletion time more easily
         presentable, by removing NaN values,
@@ -169,6 +169,8 @@ def beta_and_depletion_clean(beta,depletion,stride=1):
         2D map of beta parameter.
     depletion : np.ndarray
         2D map of depletion time, in yr.
+    rad : np.ndarray
+        2D map of galaxy radii, in pc.
     stride : int
         Numer of points to be skipped over.
     
@@ -180,18 +182,28 @@ def beta_and_depletion_clean(beta,depletion,stride=1):
     depletion : np.ndarray
         1D array of depletion time, with nans
         removed and points skipped.
+    rad1D : np.ndarray
+        1D array of radius, corresponding to
+        beta and depletion
     '''
     # Making them 1D!
     beta = beta.reshape(beta.size)
     depletion = depletion.reshape(beta.size)
+    if rad!=None:
+        rad1D = rad.reshape(beta.size)
     
     # Cleaning the Depletion/Beta arrays!
     index = np.arange(beta.size)
     index = index[ np.isfinite(beta*np.log10(depletion)) ]
     beta = beta[index][::stride]
-    depletion = depletion[index][::stride]  # No more NaNs or infs!
+    depletion = depletion[index][::stride]   # No more NaNs or infs!
+    if rad!=None:
+        rad1D = rad1D[index][::stride]
     
-    return beta, depletion
+    if rad!=None:
+        return beta, depletion, rad1D
+    else:
+        return beta,depletion
 
 def cube_moments(name,conbeam):
     '''
