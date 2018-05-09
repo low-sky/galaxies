@@ -114,14 +114,15 @@ class Galaxy(object):
             elif name.upper() == 'NGC4303':
                 self.name = 'NGC4303'
                 self.distance = 14.5 * u.Mpc
-                self.position_angle = Angle(0 * u.deg)
+                #self.position_angle = Angle(0 * u.deg)
+                self.position_angle = Angle(313.2 * u.deg)  # PHANGS best fit parameters
                 self.inclination = Angle(18 * u.deg)
                 self.velocity = 1569 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'M100':
                 self.name = 'M100'
                 self.distance = 14.3e6 * u.pc
-    #            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
+                #self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
                 self.position_angle = Angle(153 * u.deg)
                 self.inclination = Angle(30 * u.deg)
                 self.velocity = 1575 * u.km / u.s
@@ -134,21 +135,27 @@ class Galaxy(object):
                 self.velocity = 411.3 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
-		self.name = 'NGC1672'
-		self.position_angle = Angle(141.9 * u.deg) # Phillipp's version
-		self.inclination = Angle(24.7 * u.deg) # Phillipp's version
-        	#self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
+                self.name = 'NGC1672'
+                self.position_angle = Angle(141.9 * u.deg) # Phillipp's version
+                self.inclination = Angle(24.7 * u.deg) # Phillipp's version
+                #self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
                 #self.position_angle = Angle(170 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC4535':
-		self.name = 'NGC4535'
-                self.position_angle = Angle(0 * u.deg)
+                self.name = 'NGC4535'
+                #self.position_angle = Angle(0 * u.deg)
+                self.position_angle = Angle(179.4 * u.deg)  # PHANGS best fit parameters
                 self.provenance = 'Override'
             elif name.upper() == 'NGC5068':
-		self.name = 'NGC5068'
-                self.position_angle = Angle(110 * u.deg)
+                self.name = 'NGC5068'
+                #self.position_angle = Angle(110 * u.deg)
+                self.position_angle = Angle(352.5 * u.deg)  # PHANGS best fit parameters
                 self.provenance = 'Override'
-#            else:
+            elif name.upper() == 'NGC2835':
+                self.name = 'NGC2835'
+                self.position_angle = Angle(0.0 * u.deg)  # PHANGS best fit parameters
+                self.provenance = 'Override'
+            #else:
 
             if not self.provenance:
                 raise ValueError("The information for galaxy {}".format(name)+
