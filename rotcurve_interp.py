@@ -37,6 +37,12 @@ def rotcurve(name,smooth='spline',knots=8):
         Number of internal knots in BSpline of
         vrot, which is used to calculate epicyclic
         frequency.
+    mode : str
+        'PHANGS'      - Uses PHANGS rotcurve.
+        'DiskFit_12m' - Uses fitted rotcurve from
+                        12m+7m data.        
+        'DiskFit_7m'  - Uses fitted rotcurve from
+                        7m data.
         
     Returns:
     --------
@@ -57,15 +63,24 @@ def rotcurve(name,smooth='spline',knots=8):
     
     
     # Rotation Curves
-    if name=='m33':
-        m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
-        R = m33['r']
-        vrot = m33['Vt']
-        vrot_e = None
-        print "WARNING: M33 rotcurve error bars not accounted for!"
-    else:
-        fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC.txt"
+    if mode.lower()=='phangs':
+        if name=='m33':
+            m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
+            R = m33['r']
+            vrot = m33['Vt']
+            vrot_e = None
+            print "WARNING: M33 rotcurve error bars not accounted for!"
+        else:
+            fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC.txt"
+            R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+    elif mode.lower()=='diskfit_12m':
+        fname = "diskfit/rotcurves/"+name.lower()+"_co21_12m+7m_RC.txt"
         R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+    elif mode.lower()=='diskfit_7m':
+        fname = "diskfit/rotcurves/"+name.lower()+"_co21_7m_RC.txt"
+        R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+    else:
+        raise ValueError("'mode' must be PHANGS, diskfit_12m, or diskfit_7m!")
 #         fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC_OLD.txt"
 #         R, vrot = np.loadtxt(fname,skiprows=True,unpack=True)
         # R = Radius from center of galaxy, in arcsec.
@@ -303,7 +318,7 @@ def localshear(name,smooth='spline',knots=8):
     
     return A
 
-def linewidth_iso(name,beam,smooth='spline',knots=8):
+def linewidth_iso(name,beam,smooth='spline',knots=8,mode='PHANGS'):
     '''
     Returns the effective LoS velocity dispersion
     due to the galaxy's rotation, sigma_gal, for
@@ -326,7 +341,13 @@ def linewidth_iso(name,beam,smooth='spline',knots=8):
         Number of INTERNAL knots in BSpline
         representation of rotation curve, which
         is used in calculation of epicyclic
-        frequency (and, therefore, sigma_gal).
+        frequency (and, therefore, sigma_gal).    
+    mode : str
+        'PHANGS'      - Uses PHANGS rotcurve.
+        'DiskFit_12m' - Uses fitted rotcurve from
+                        12m+7m data.        
+        'DiskFit_7m'  - Uses fitted rotcurve from
+                        7m data.
         
     Returns:
     --------
@@ -345,7 +366,7 @@ def linewidth_iso(name,beam,smooth='spline',knots=8):
     Rc = beam*d / u.rad                         # Beam size, in parsecs
     
     # Use "interp" to generate R, vrot (smoothed), k.
-    R, vrot, R_e, vrot_e, k = gal.rotcurve(smooth=smooth,knots=knots)
+    R, vrot, R_e, vrot_e, k = gal.rotcurve(smooth=smooth,knots=knots,mode=mode)
     
     # Calculate sigma_gal = kappa*Rc
     sigma_gal = k(R)*Rc

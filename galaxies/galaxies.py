@@ -227,7 +227,7 @@ class Galaxy(object):
         return self.center_position.to_pixel(wcs)
 
 
-    def rotcurve(self,smooth='spline',knots=8):
+    def rotcurve(self,smooth='spline',knots=8,mode='PHANGS'):
         '''
         Reads a provided rotation curve table and
         returns interpolator functions for rotational
@@ -247,7 +247,13 @@ class Galaxy(object):
         knots : int
             Number of internal knots in BSpline of
             vrot, which is used to calculate epicyclic
-            frequency.
+            frequency.    
+        mode : str
+            'PHANGS'      - Uses PHANGS rotcurve.
+            'DiskFit_12m' - Uses fitted rotcurve from
+                            12m+7m data.        
+            'DiskFit_7m'  - Uses fitted rotcurve from
+                            7m data.
             
         Returns:
         --------
@@ -263,17 +269,27 @@ class Galaxy(object):
 
         # Basic info
         d = (self.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
-
+            
         # Rotation Curves
-        if self.name=='m33':
-            m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
-            R = m33['r']
-            vrot = m33['Vt']
-            vrot_e = None
-            print "WARNING: M33 rotcurve error bars not accounted for!"
-        else:
-            fname = "phangsdata/"+self.name.lower()+"_co21_12m+7m+tp_RC.txt"
+        if mode.lower()=='phangs':
+            if self.name=='m33':
+                m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
+                R = m33['r']
+                vrot = m33['Vt']
+                vrot_e = None
+                print "WARNING: M33 rotcurve error bars not accounted for!"
+            else:
+                fname = "phangsdata/"+self.name.lower()+"_co21_12m+7m+tp_RC.txt"
+                R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+        elif mode.lower()=='diskfit_12m':
+            fname = "diskfit/rotcurves/"+self.name.lower()+"_co21_12m+7m_RC.txt"
             R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+        elif mode.lower()=='diskfit_7m':
+            fname = "diskfit/rotcurves/"+self.name.lower()+"_co21_7m_RC.txt"
+            R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+        else:
+            raise ValueError("'mode' must be PHANGS, diskfit_12m, or diskfit_7m!")
+            
             # R = Radius from center of galaxy, in arcsec.
             # vrot = Rotational velocity, in km/s.
         # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
