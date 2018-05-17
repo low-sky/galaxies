@@ -410,6 +410,26 @@ class Galaxy(object):
             K=3                # Order of the BSpline
             t,c,k = interpolate.splrep(R,vrot_u,s=0,k=K)
             vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
+        elif smooth.lower() in ['simple','exponential','expo']:
+            def vcirc_simple(r, *pars):
+                '''
+                Fit Eq. 8 from Leroy et al. 2013.
+                '''
+                vflat, rflat = pars
+                return vflat*(1.0-np.exp(-r / rflat))
+                
+            params, params_covariance = optimize.curve_fit(\
+                                            vcirc_simple,R_e,vrot(R_e),p0=(1,1000),sigma=vrot_e,\
+                                            bounds=((0,0.01),(np.inf,np.inf)))
+            print "vflat,rflat = "+str(params)
+            vrot_s = vcirc_simple(R,params[0],params[1])  # Array.
+
+            # BSpline interpolation of vrot_u(R)
+            K=3                # Order of the BSpline
+            t,c,k = interpolate.splrep(R,vrot_s,s=0,k=K)
+            vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
+        else:
+            raise ValueError('Invalid smoothing mode.')
 
         # Epicyclic Frequency
         dVdR = np.gradient(vrot(R),R)

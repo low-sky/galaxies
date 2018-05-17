@@ -51,6 +51,10 @@ def rotcurve(name,smooth='spline',knots=8):
     vrot : scipy.interpolate._bsplines.BSpline
         Function for the interpolated rotation
         curve, in km/s.
+    R_e : np.ndarray
+        1D array of original rotcurve radii, in pc.
+    vrot_e : np.ndarray
+        1D array of original rotcurve errors, in pc.
     k : scipy.interpolate.interp1d
         Function for the interpolated epicyclic
         frequency.
@@ -158,6 +162,26 @@ def rotcurve(name,smooth='spline',knots=8):
         K=3                # Order of the BSpline
         t,c,k = interpolate.splrep(R,vrot_u,s=0,k=K)
         vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
+    elif smooth.lower() in ['simple','exponential','expo']:
+        def vcirc_simple(r, *pars):
+            '''
+            Fit Eq. 8 from Leroy et al. 2013.
+            '''
+            vflat, rflat = pars
+            return vflat*(1.0-np.exp(-r / rflat))
+            
+        params, params_covariance = optimize.curve_fit(\
+                                        vcirc_simple,R_e,vrot(R_e),p0=(1,1000),sigma=vrot_e,\
+                                        bounds=((0,0.01),(np.inf,np.inf)))
+        print "vflat,rflat = "+str(params)
+        vrot_s = vcirc_simple(R,params[0],params[1])  # Array.
+
+        # BSpline interpolation of vrot_u(R)
+        K=3                # Order of the BSpline
+        t,c,k = interpolate.splrep(R,vrot_s,s=0,k=K)
+        vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
+    else:
+        raise ValueError('Invalid smoothing mode.')
     
     # Epicyclic Frequency
     dVdR = np.gradient(vrot(R),R)
@@ -277,7 +301,7 @@ def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     
     return spl
 
-def localshear(name,smooth='spline',knots=8):
+def localshear(name,smooth='spline',knots=8,mode='PHANGS'):
     '''
     Returns the local shear parameter (i.e. the
     Oort A constant) for a galaxy with a provided
@@ -298,7 +322,13 @@ def localshear(name,smooth='spline',knots=8):
     knots : int
         Number of INTERNAL knots in BSpline
         representation of rotation curve.
-        
+    mode : str
+        'PHANGS'      - Uses PHANGS rotcurve.
+        'DiskFit_12m' - Uses fitted rotcurve from
+                        12m+7m data.        
+        'DiskFit_7m'  - Uses fitted rotcurve from
+                        7m data.
+                        
     Returns:
     --------
     A : scipy.interpolate._bsplines.BSpline
@@ -308,7 +338,7 @@ def localshear(name,smooth='spline',knots=8):
     gal = Galaxy(name)
     
     # Use "interp" to generate R, vrot (smoothed).
-    R, vrot, R_e, vrot_e, k_discard = gal.rotcurve(smooth=smooth, knots=knots)
+    R, vrot, R_e, vrot_e, k_discard = gal.rotcurve(smooth=smooth, knots=knots,mode=mode)
     
     # Oort A constant.
     Omega = vrot(R) / R     # Angular velocity.
