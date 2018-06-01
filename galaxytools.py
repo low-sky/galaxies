@@ -19,7 +19,7 @@ import copy
 import os
 
 
-def info(name,conbeam=None):
+def info(name,conbeam=None,data_mode='12m'):
     '''
     Returns basic info from galaxies.
     Astropy units are NOT attached to outputs.
@@ -51,8 +51,16 @@ def info(name,conbeam=None):
         2D map of the SFR, in Msun/kpc^2/yr.
     '''
     name = name.lower()
-    
+    if data_mode == '7m':
+        data_mode = '7m'
+        conbeam=None
+        print 'WARNING: SFR maps come in 12m sizes only.'
+        print 'WARNING: Convolution forcibly disabled.'
+    elif data_mode in ['12m','12m+7m']:
+        data_mode = '12m+7m'
+        
     if name=='m33':
+        print 'WARNING: Only 12m data available. Also, M33 isn\'t properly supported.'
         hdr = fits.getheader(\
                 'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
         hdr_beam = fits.getheader('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')
@@ -68,11 +76,11 @@ def info(name,conbeam=None):
                 # Technically not a moment1 map, but it works in this context. (???)
         I_tpeak = fits.getdata('notphangsdata/m33.co21_iram.14B-088_HI.peaktemps.fits')   # Peak T, in K.
     else:
-        hdr = fits.getheader('phangsdata/'+name+'_co21_12m+7m+tp_mom0.fits')
+        hdr = fits.getheader('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits')
         beam = hdr['BMAJ']                                                    # In degrees.
-        I_mom0 = fits.getdata('phangsdata/'+name+'_co21_12m+7m+tp_mom0.fits')    # In K km/s.
-        I_mom1 = fits.getdata('phangsdata/'+name+'_co21_12m+7m+tp_mom1.fits')    # In km/s.
-        I_tpeak = fits.getdata('phangsdata/'+name+'_co21_12m+7m+tp_tpeak.fits')  # In K.
+        I_mom0 = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits')    # In K km/s.
+        I_mom1 = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom1.fits')    # In km/s.
+        I_tpeak = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_tpeak.fits')  # In K.
     
     # Fix the headers so WCS doesn't think that they're 3D!
     if name!='m33':
@@ -97,7 +105,7 @@ def info(name,conbeam=None):
     if name=='m33':
         cube = SpectralCube.read('notphangsdata/'+name+'.co21_iram.fits')
     else:
-        cube = SpectralCube.read('phangsdata/'+name+'_co21_12m+7m+tp_flat_round_k.fits')
+        cube = SpectralCube.read('phangsdata/'+name+'_co21_'+data_mode+'+tp_flat_round_k.fits')
         
         
     # CONVOLUTION, if enabled:
@@ -192,7 +200,7 @@ def beta_and_depletion_clean(beta,depletion,rad=None,stride=1):
     if rad!=None:
         rad1D = rad.reshape(beta.size)
     
-    # Cleaning the Depletion/Beta arrays!
+    # Cleaning the Rad/Depletion/Beta arrays!
     index = np.arange(beta.size)
     index = index[ np.isfinite(beta*np.log10(depletion)) ]
     beta = beta[index][::stride]
@@ -200,6 +208,16 @@ def beta_and_depletion_clean(beta,depletion,rad=None,stride=1):
     if rad!=None:
         rad1D = rad1D[index][::stride]
     
+    # Ordering the Rad/Depletion/Beta arrays!
+    import operator
+    if rad!=None:
+        L = sorted(zip(rad1D.value,beta,depletion), key=operator.itemgetter(0))
+        rad1D,beta,depletion = np.array(zip(*L)[0])*u.pc, np.array(zip(*L)[1]), np.array(zip(*L)[2])
+    else:
+        L = sorted(zip(beta,depletion), key=operator.itemgetter(0))
+        beta,depletion = np.array(zip(*L)[0]), np.array(zip(*L)[1])
+    
+    # Returning everything!
     if rad!=None:
         return beta, depletion, rad1D
     else:

@@ -416,7 +416,7 @@ def linewidth_iso(name,beam,smooth='spline',knots=8,mode='PHANGS'):
     
     return R, sigma_gal
 
-def moments(name,hdr,beam,I_mom0,I_tpeak,mode=''):
+def moments(name,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
     '''
     Returns things like 'sigma' (line width, in km/s)
     or 'Sigma' (surface density) for a galaxy. The
@@ -434,10 +434,13 @@ def moments(name,hdr,beam,I_mom0,I_tpeak,mode=''):
         0th moment, in K km/s.
     I_tpeak : np.ndarray
         Peak temperature, in K.
+    alpha : float
+        CO(2-1) to H2 conversion factor.
+        Default: 6.7 (Msun pc^-2) / (K km s^-1)
 
     Returns:
     --------
-    R : np.ndarray
+    rad : np.ndarray
         Radius array.
     (s/S)igma : np.ndarray
         Maps for line width and surface density,
@@ -465,7 +468,7 @@ def moments(name,hdr,beam,I_mom0,I_tpeak,mode=''):
     beam = beam * pcperdeg                                  # Beam size, in pc
 
     # Line width, Surface density
-    alpha = 6.7  # (???) Units: (Msun pc^-2) / (K km s^-1)
+    #alpha = 6.7  # (???) Units: (Msun pc^-2) / (K km s^-1)
     sigma = I_mom0 / (np.sqrt(2*np.pi) * I_tpeak)
     Sigma = alpha*I_mom0   # (???) Units: Msun pc^-2
     
