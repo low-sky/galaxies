@@ -1,4 +1,3 @@
-
 from astropy.coordinates import SkyCoord, Angle, FK5
 from astroquery.ned import Ned
 import astropy.units as u
@@ -8,6 +7,12 @@ from astropy.wcs import WCS
 import warnings
 import numpy as np
 from astropy.utils.data import get_pkg_data_filename
+
+import pandas as pd
+from scipy import interpolate
+# Had to be imported here, otherwise I'd
+# get a "global name 'interpolate'/'pd' is not
+# defined" error message for some reason.
 
 def parse_galtable(galobj,name):
     table_name = get_pkg_data_filename('data/gal_base.fits',
@@ -131,12 +136,16 @@ class Galaxy(object):
                 self.velocity = 411.3 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
-                self.position_angle = Angle(170 * u.deg)
+                self.name = 'NGC1672'
+                self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
+                #self.position_angle = Angle(170 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC4535':
+                self.name = 'NGC4535'
                 self.position_angle = Angle(0 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC5068':
+                self.name = 'NGC5068'
                 self.position_angle = Angle(110 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'IC5332':
@@ -213,6 +222,205 @@ class Galaxy(object):
             raise ValueError("Either wcs or header must be given.")
 
         return self.center_position.to_pixel(wcs)
+
+
+    def rotcurve(self, smooth='False', knots=8,
+                 rcdir='/mnt/bigdata/PHANGS/OtherData/derived/Rotation_curves/'):
+        '''
+        Reads a provided rotation curve table and
+        returns interpolator functions for rotational
+        velocity vs radius, and epicyclic frequency vs
+        radius.
+        WARNING: Only for NGC1672 and M33 at the moment.
+
+        Parameters:
+        -----------
+        smooth : bool
+            Determines whether the returned rotation
+            curve returned is smoothed or not.
+        knots : int
+            Number of internal knots in BSpline of
+            vrot, which is used to calculate epicyclic
+            frequency.
+
+        Returns:
+        --------
+        R : np.ndarray
+            1D array of radii of galaxy, in pc.
+        vrot : scipy.interpolate._bsplines.BSpline
+            Function for the interpolated rotation
+            curve.
+        k : scipy.interpolate.interp1d
+            Function for the interpolated epicyclic
+            frequency.
+        '''
+
+        # Basic info
+        d = (self.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
+
+        # Rotation Curves
+        if self.name.upper()=='M33':
+            m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
+            R = m33['r']                                        # Rotation curve, in arcsecs.
+            vrot = m33['Vt']
+        else:
+            fname = rcdir + self.name.lower()+"_co21_12m+7m+tp_RC.txt"
+            R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
+            # R = Radius from center of galaxy, in arcsec.
+            # vrot = Rotational velocity, in km/s.
+        # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are treated as unitless!
+
+        # Adding a (0,0) data point to rotation curve
+        if R[0]!=0:
+            R = np.roll(np.concatenate((R,[0]),0),1)
+            vrot = np.roll(np.concatenate((vrot,[0]),0),1)
+
+        # Units & conversions
+        R = R*u.arcsec
+        vrot = vrot*u.km/u.s    
+        R = R.to(u.rad)            # Radius, in radians.
+        R = (R*d).value            # Radius, in pc, but treated as unitless.
+
+        def bspline(X,Y,knots,k=3,lowclamp=False, highclamp=False):
+            '''
+            Returns a BSpline interpolation function
+            of a provided 1D curve.
+            With fewer knots, this will provide a
+            smooth curve that ignores local wiggles.
+            
+            Parameters:
+            -----------
+            X,Y : np.ndarray
+                1D arrays for the curve being interpolated.
+            knots : int
+                Number of INTERNAL knots, i.e. the number
+                of breakpoints that are being considered
+                when generating the BSpline.
+            k : int
+                Degree of the BSpline. Recommended to leave
+                at 3.
+            lowclamp : bool
+                Enables or disables clamping at the lowest
+                X-value.
+            highclamp : bool
+                Enables or disables clamping at the highest
+                X-value.
+                
+            Returns:
+            --------
+            spl : scipy.interpolate._bsplines.BSpline
+                Interpolation function that works over X's
+                domain.
+            '''
+            
+            # Creating the knots
+            t_int = np.linspace(X.min(),X.max(),knots)  # Internal knots, incl. beginning and end points of domain.
+
+            t_begin = np.linspace(X.min(),X.min(),k)
+            t_end   = np.linspace(X.max(),X.max(),k)
+            t = np.r_[t_begin,t_int,t_end]              # The entire knot vector.
+            
+            # Generating the spline
+            w = np.zeros(X.shape)+1                     # Weights.
+            if lowclamp==True:
+                w[0]=X.max()*1000000                    # Setting a high weight for the X.min() term.
+            if highclamp==True:
+                w[-1]=X.max()*1000000                   # Setting a high weight for the X.max() term.
+            spl = interpolate.make_lsq_spline(X, Y, t, k,w)
+            
+            return spl
+        # BSpline of vrot(R)
+        K=3                # Order of the BSpline
+        t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
+        vrot = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
+                                                                # 'vrot' is now a function, not an array.
+        # Creating "higher-resolution" rotation curve
+        Nsteps = 10000
+        R = np.linspace(R.min(),R.max(),Nsteps)
+
+        # SMOOTH BSpline of vrot(R)
+        vrot_s = bspline(R,vrot(R),knots=knots,lowclamp=True)
+
+        # Epicyclic Frequency
+        dVdR = np.gradient(vrot_s(R),R)
+        k2 =  2.*(vrot_s(R)**2 / R**2 + vrot_s(R)/R*dVdR)
+        k = interpolate.interp1d(R,np.sqrt(k2))
+
+        if smooth==True:
+            return R, vrot_s, k
+        else:
+            return R, vrot, k
+
+    def rotmap(self,header=None, position_angle=None, inclination=None):
+        '''
+        Returns "observed velocity" map, and "rotation
+        map". (The latter is just to make sure that the
+        code is working properly.)
+
+        Parameters:
+        -----------
+        header : astropy.io.fits.header.Header
+            Header for the galaxy.
+
+        Returns:
+        --------
+        vobs : np.ndarray
+            Map of observed velocity, in km/s.
+        R : np.ndarray
+            Map of radii of galaxy, in pc.
+        Dec, RA : np.ndarray
+            Maps of Dec and RA (respectively), 
+            in degrees.
+        '''    
+        # Basic info
+        vsys = self.vsys
+        if vsys==None:
+            vsys = self.velocity
+            # For some reason, some galaxies (M33, NGC4303...) have velocity listed as "velocity" instead of "vsys".
+        if not inclination:
+            I = self.inclination
+        else:
+            I = inclination
+
+        if not position_angle:
+            PA = (self.position_angle / u.deg * u.deg)        # Position angle (angle from N to line of nodes)
+        else:
+            PA = position_angle
+    
+        RA_cen = self.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees 
+        Dec_cen = self.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees
+
+                                                         # NOTE: The x-direction is defined as the LoN.
+        d = (self.distance).to(u.parsec)                 # Distance to galaxy, from Mpc to pc
+        
+
+        # vrot Interpolation
+        R_1d, vrot, k_discard = self.rotcurve(self)    # Creates "vrot" interpolation function,
+                                                       #    and 1D array of R.
+
+
+        # Generating displayable grids
+        X,Y = self.radius(header=header, returnXY=True)  # Coordinate grid in galaxy plane, as "seen" by telescope,
+                                                      #    in Mpc.
+        X = X.to(u.pc)
+        Y = Y.to(u.pc)                               # Now they're in parsecs.
+        # NOTE: - X is parallel to the line of nodes. The PA is simply angle from North to X-axis.
+        #       - X- and Y-axes are exactly 90 degrees apart, which is only true for when X is parallel (or perp.)
+        #               to the line of nodes.
+
+        R = np.sqrt(X**2 + Y**2)                     # Grid of radius in parsecs.
+        R = (R.value<R_1d.max()).astype(int) * R  
+        R[ R==0 ] = np.nan                           # Grid of radius, with values outside interpolation range
+                                                     #    removed.
+
+        skycoord = self.skycoord_grid(header=header)   # Coordinates (RA,Dec) of the above grid at each point, 
+                                                    #    in degrees.
+        RA = skycoord.ra                             # Grid of RA in degrees.
+        Dec = skycoord.dec                           # Grid of Dec in degrees.
+
+
+        vobs = (vsys.value + vrot(R)*np.sin(I)*np.cos( np.arctan2(Y,X) )) * (u.km/u.s)
+        return vobs, R, Dec, RA
 
 # push or pull override table using astropy.table
 
