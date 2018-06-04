@@ -100,10 +100,10 @@ class Galaxy(object):
                 self.name = 'M33'
                 self.distance = 8.4e5 * u.pc
                 self.center_position = \
-                    SkyCoord(23.461667, 30.660194, unit=(u.deg, u.deg),
+                    SkyCoord(23.4607, 30.6583, unit=(u.deg, u.deg),
                              frame='fk5')
-                self.position_angle = Angle(202 * u.deg)
-                self.inclination = Angle(56 * u.deg)
+                self.position_angle = Angle(201.12 * u.deg)
+                self.inclination = Angle(55.08 * u.deg)
                 self.velocity = -179 * u.km / u.s
                 self.provenance = 'Override'
             elif name.upper() == 'M83':
