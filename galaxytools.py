@@ -177,6 +177,7 @@ def cube_get(gal,data_mode):
     else:
         raise ValueError("'gal' must be a str or galaxy!")
 
+<<<<<<< HEAD
     # Spectral Cube
     if name=='m33':
         filename = 'notphangsdata/'+name+'.co21_iram.fits'
@@ -190,6 +191,9 @@ def cube_get(gal,data_mode):
     return cube
     
 def info(gal,conbeam=None,data_mode='12m'):
+=======
+def info(name,conbeam=None,data_mode='12m'):
+>>>>>>> 49fca3f8eeab16043641bda5db997b354dc78346
     '''
     Returns basic info from galaxies.
     Astropy units are NOT attached to outputs.
@@ -221,6 +225,7 @@ def info(gal,conbeam=None,data_mode='12m'):
     sfr : np.ndarray
         2D map of the SFR, in Msun/kpc^2/yr.
     '''
+<<<<<<< HEAD
     if isinstance(gal,Galaxy):
         name = gal.name.lower()
     elif isinstance(gal,str):
@@ -245,6 +250,21 @@ def info(gal,conbeam=None,data_mode='12m'):
     hdr = hdr_get(gal,data_mode)
     
     if name=='m33':
+=======
+    name = name.lower()
+    if data_mode == '7m':
+        data_mode = '7m'
+        conbeam=None
+        print 'WARNING: SFR maps come in 12m sizes only.'
+        print 'WARNING: Convolution forcibly disabled.'
+    elif data_mode in ['12m','12m+7m']:
+        data_mode = '12m+7m'
+        
+    if name=='m33':
+        print 'WARNING: Only 12m data available. Also, M33 isn\'t properly supported.'
+        hdr = fits.getheader(\
+                'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+>>>>>>> 49fca3f8eeab16043641bda5db997b354dc78346
         hdr_beam = fits.getheader('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')
             # WARNING: The IRAM .fits files give headers that galaxies.py misinterprets somehow,
             #    causing the galaxy to appear weirdly warped and lopsided.
@@ -252,7 +272,15 @@ def info(gal,conbeam=None,data_mode='12m'):
             #    so the IRAM one is used for that.
         beam = hdr_beam['BMAJ']
     else:
+<<<<<<< HEAD
         beam = hdr['BMAJ']                                                    # In degrees.
+=======
+        hdr = fits.getheader('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits')
+        beam = hdr['BMAJ']                                                    # In degrees.
+        I_mom0 = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits')    # In K km/s.
+        I_mom1 = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom1.fits')    # In km/s.
+        I_tpeak = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_tpeak.fits')  # In K.
+>>>>>>> 49fca3f8eeab16043641bda5db997b354dc78346
     
     # Fix the headers so WCS doesn't think that they're 3D!
     if name!='m33':
@@ -267,7 +295,15 @@ def info(gal,conbeam=None,data_mode='12m'):
     
     sfr = sfr_get(gal,hdr)
            
+<<<<<<< HEAD
     cube = cube_get(gal,data_mode)
+=======
+    # Spectral Cube
+    if name=='m33':
+        cube = SpectralCube.read('notphangsdata/'+name+'.co21_iram.fits')
+    else:
+        cube = SpectralCube.read('phangsdata/'+name+'_co21_'+data_mode+'+tp_flat_round_k.fits')
+>>>>>>> 49fca3f8eeab16043641bda5db997b354dc78346
         
         
     # CONVOLUTION, if enabled:
@@ -373,12 +409,20 @@ def beta_and_depletion_clean(beta,depletion,rad=None,stride=1):
     # Ordering the Rad/Depletion/Beta arrays!
     import operator
     if rad!=None:
+<<<<<<< HEAD
         L = sorted(zip(np.ravel(rad1D.value),np.ravel(beta),np.ravel(depletion)), key=operator.itemgetter(0))
         rad1D,beta,depletion = np.array(list(zip(*L))[0])*u.pc, np.array(list(zip(*L))[1]),\
                                np.array(list(zip(*L))[2])
     else:
         L = sorted(zip(np.ravel(beta),np.ravel(depletion)), key=operator.itemgetter(0))
         beta,depletion = np.array(list(zip(*L))[0]), np.array(list(zip(*L))[1])
+=======
+        L = sorted(zip(rad1D.value,beta,depletion), key=operator.itemgetter(0))
+        rad1D,beta,depletion = np.array(zip(*L)[0])*u.pc, np.array(zip(*L)[1]), np.array(zip(*L)[2])
+    else:
+        L = sorted(zip(beta,depletion), key=operator.itemgetter(0))
+        beta,depletion = np.array(zip(*L)[0]), np.array(zip(*L)[1])
+>>>>>>> 49fca3f8eeab16043641bda5db997b354dc78346
     
     # Returning everything!
     if rad!=None:

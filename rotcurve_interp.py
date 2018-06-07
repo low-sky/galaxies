@@ -430,7 +430,11 @@ def linewidth_iso(gal,beam,smooth='spline',knots=8,mode='PHANGS'):
     
     return R, sigma_gal
 
+<<<<<<< HEAD
 def moments(gal,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
+=======
+def moments(name,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
+>>>>>>> 49fca3f8eeab16043641bda5db997b354dc78346
     '''
     Returns things like 'sigma' (line width, in km/s)
     or 'Sigma' (surface density) for a galaxy. The
