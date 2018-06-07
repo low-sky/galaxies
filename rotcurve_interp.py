@@ -9,7 +9,7 @@ import astropy.units as u
 import astropy.wcs as wcs
 from astropy.table import Table
 from spectral_cube import SpectralCube
-from galaxies import Galaxy
+from galaxies.galaxies import Galaxy
 
 from pandas import DataFrame, read_csv
 import pandas as pd
@@ -39,9 +39,9 @@ def rotcurve(name,smooth='spline',knots=8):
         frequency.
     mode : str
         'PHANGS'      - Uses PHANGS rotcurve.
-        'DiskFit_12m' - Uses fitted rotcurve from
+        'diskfit12m' - Uses fitted rotcurve from
                         12m+7m data.        
-        'DiskFit_7m'  - Uses fitted rotcurve from
+        'diskfit7m'  - Uses fitted rotcurve from
                         7m data.
         
     Returns:
@@ -73,18 +73,18 @@ def rotcurve(name,smooth='spline',knots=8):
             R = m33['r']
             vrot = m33['Vt']
             vrot_e = None
-            print "WARNING: M33 rotcurve error bars not accounted for!"
+            print( "WARNING: M33 rotcurve error bars not accounted for!")
         else:
             fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC.txt"
             R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
-    elif mode.lower()=='diskfit_12m':
+    elif mode.lower()=='diskfit12m':
         fname = "diskfit/rotcurves/"+name.lower()+"_co21_12m+7m_RC.txt"
         R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
-    elif mode.lower()=='diskfit_7m':
+    elif mode.lower()=='diskfit7m':
         fname = "diskfit/rotcurves/"+name.lower()+"_co21_7m_RC.txt"
         R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
     else:
-        raise ValueError("'mode' must be PHANGS, diskfit_12m, or diskfit_7m!")
+        raise ValueError("'mode' must be PHANGS, diskfit12m, or diskfit7m!")
 #         fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC_OLD.txt"
 #         R, vrot = np.loadtxt(fname,skiprows=True,unpack=True)
         # R = Radius from center of galaxy, in arcsec.
@@ -117,7 +117,7 @@ def rotcurve(name,smooth='spline',knots=8):
     
     # SMOOTHING:
     if smooth==None or smooth.lower()=='none':
-        print "WARNING: Smoothing disabled!"
+        print( "WARNING: Smoothing disabled!")
     elif smooth.lower()=='spline':
         # BSpline of vrot(R)
         vrot = bspline(R,vrot(R),knots=knots,lowclamp=True)
@@ -135,7 +135,7 @@ def rotcurve(name,smooth='spline',knots=8):
         params, params_covariance = scipy.optimize.curve_fit(\
                                         vcirc_brandt,R_e,vrot(R_e),p0=(1,1,1),sigma=vrot_e,\
                                         bounds=((0.5,0,0),(np.inf,np.inf,np.inf)))
-        print "n,vmax,rmax = "+str(params)
+        print( "n,vmax,rmax = "+str(params))
         vrot_b = vcirc_brandt(R,params[0],params[1],params[2])  # Array.
 
         # BSpline interpolation of vrot_s(R)
@@ -155,7 +155,7 @@ def rotcurve(name,smooth='spline',knots=8):
         params, params_covariance = optimize.curve_fit(\
                                         vcirc_universal,R_e,vrot(R_e),p0=(1,1,600),sigma=vrot_e,\
                                         bounds=((0,0.01,0),(np.inf,np.inf,np.inf)))
-        print "v0,a,rmax = "+str(params)
+        print( "v0,a,rmax = "+str(params))
         vrot_u = vcirc_universal(R,params[0],params[1],params[2])  # Array.
 
         # BSpline interpolation of vrot_u(R)
@@ -173,7 +173,7 @@ def rotcurve(name,smooth='spline',knots=8):
         params, params_covariance = optimize.curve_fit(\
                                         vcirc_simple,R_e,vrot(R_e),p0=(1,1000),sigma=vrot_e,\
                                         bounds=((0,0.01),(np.inf,np.inf)))
-        print "vflat,rflat = "+str(params)
+        print( "vflat,rflat = "+str(params))
         vrot_s = vcirc_simple(R,params[0],params[1])  # Array.
 
         # BSpline interpolation of vrot_u(R)
@@ -301,7 +301,7 @@ def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     
     return spl
 
-def localshear(name,smooth='spline',knots=8,mode='PHANGS'):
+def localshear(gal,smooth='spline',knots=8,mode='PHANGS'):
     '''
     Returns the local shear parameter (i.e. the
     Oort A constant) for a galaxy with a provided
@@ -310,8 +310,9 @@ def localshear(name,smooth='spline',knots=8,mode='PHANGS'):
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy in question.
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
     smooth : str
         Determines smoothing for rotation curve.
         Available modes:
@@ -324,9 +325,9 @@ def localshear(name,smooth='spline',knots=8,mode='PHANGS'):
         representation of rotation curve.
     mode : str
         'PHANGS'      - Uses PHANGS rotcurve.
-        'DiskFit_12m' - Uses fitted rotcurve from
+        'DiskFit12m'  - Uses fitted rotcurve from
                         12m+7m data.        
-        'DiskFit_7m'  - Uses fitted rotcurve from
+        'DiskFit7m'   - Uses fitted rotcurve from
                         7m data.
                         
     Returns:
@@ -335,7 +336,13 @@ def localshear(name,smooth='spline',knots=8,mode='PHANGS'):
         Oort A "constant", as a function of 
         radius R, in km/s/kpc.
     '''
-    gal = Galaxy(name)
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+        gal = Galaxy(name.upper())
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
     
     # Use "interp" to generate R, vrot (smoothed).
     R, vrot, R_e, vrot_e, k_discard = gal.rotcurve(smooth=smooth, knots=knots,mode=mode)
@@ -348,7 +355,7 @@ def localshear(name,smooth='spline',knots=8,mode='PHANGS'):
     
     return A
 
-def linewidth_iso(name,beam,smooth='spline',knots=8,mode='PHANGS'):
+def linewidth_iso(gal,beam,smooth='spline',knots=8,mode='PHANGS'):
     '''
     Returns the effective LoS velocity dispersion
     due to the galaxy's rotation, sigma_gal, for
@@ -356,8 +363,9 @@ def linewidth_iso(name,beam,smooth='spline',knots=8,mode='PHANGS'):
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy in question.
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
     beam : float
         Beam width, in deg.
     smooth : str
@@ -374,9 +382,9 @@ def linewidth_iso(name,beam,smooth='spline',knots=8,mode='PHANGS'):
         frequency (and, therefore, sigma_gal).    
     mode : str
         'PHANGS'      - Uses PHANGS rotcurve.
-        'DiskFit_12m' - Uses fitted rotcurve from
+        'diskfit12m' - Uses fitted rotcurve from
                         12m+7m data.        
-        'DiskFit_7m'  - Uses fitted rotcurve from
+        'diskfit7m'  - Uses fitted rotcurve from
                         7m data.
         
     Returns:
@@ -387,7 +395,13 @@ def linewidth_iso(name,beam,smooth='spline',knots=8,mode='PHANGS'):
         Interpolation function for sigma_gal that
         works over R.
     '''
-    gal = Galaxy(name.upper())
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+        gal = Galaxy(name.upper())
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
     
     # Beam width
   
@@ -416,7 +430,7 @@ def linewidth_iso(name,beam,smooth='spline',knots=8,mode='PHANGS'):
     
     return R, sigma_gal
 
-def moments(name,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
+def moments(gal,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
     '''
     Returns things like 'sigma' (line width, in km/s)
     or 'Sigma' (surface density) for a galaxy. The
@@ -424,8 +438,9 @@ def moments(name,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy in question.
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
     hdr : astropy.io.fits.header.Header
         Header for the galaxy.
     beam : float
@@ -446,8 +461,13 @@ def moments(name,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
         Maps for line width and surface density,
         respectively.
     '''
-
-    gal = Galaxy(name.upper())
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+        gal = Galaxy(name.upper())
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
     rad = gal.radius(header=hdr)
     rad = rad.to(u.pc)                                      # Converts rad from Mpc to pc.
     d = gal.distance
@@ -457,12 +477,12 @@ def moments(name,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
     pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))*u.deg # The size of each pixel, in degrees. 
                                                                          # Ignore that third dimension; that's 
                                                                          # pixel size for the speed.
-    #print "Pixel size, in degrees = "+str(pixsizes_deg[0])
+    #print( "Pixel size, in degrees = "+str(pixsizes_deg[0]))
     pixsizes = pixsizes_deg[0].to(u.rad)                    # Pixel size, in radians.
     pcperpixel =  pixsizes.value*d                          # Number of parsecs per pixel.
-    #print "Pixel size, in parsecs = "+str(pcperpixel)
+    #print( "Pixel size, in parsecs = "+str(pcperpixel))
     pcperdeg = pcperpixel / pixsizes_deg[0]
-    #print "There are +"+str(pcperdeg)+"."
+    #print( "There are +"+str(pcperdeg)+".")
 
     # Beam
     beam = beam * pcperdeg                                  # Beam size, in pc
@@ -477,4 +497,4 @@ def moments(name,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
     elif mode=='Sigma':
         return rad, Sigma
     else:
-        print "SELECT A MODE."
+        print( "SELECT A MODE.")

@@ -12,23 +12,194 @@ from radio_beam import Beam
 
 from scipy import interpolate
 
-from galaxies import Galaxy
+from galaxies.galaxies import Galaxy
 import rotcurve_interp as rc
 
 import copy
 import os
 
+def mom0_get(gal,data_mode='12m'):
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+    if data_mode == '7m':
+        data_mode = '7m'
+        conbeam=None
+        print( 'WARNING: SFR maps come in 12m sizes only.') #(!!!) What about for all the new 15" maps?
+        print( 'WARNING: Convolution forcibly disabled.')
+    elif data_mode in ['12m','12m+7m']:
+        data_mode = '12m+7m'  
 
-def info(name,conbeam=None,data_mode='12m'):
+    if name=='m33':
+        filename = 'notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits'
+    else:
+        filename = 'phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits'
+    
+    if os.path.isfile(filename):
+        if name=='m33':
+            I_mom0 = fits.getdata(filename) /1000.  # In K km/s now.
+        else:
+            I_mom0 = fits.getdata(filename)         # In K km/s.
+    else:
+        print( "WARNING: No mom0 map found!")
+        I_mom0 = None
+    return I_mom0
+
+def mom1_get(gal,data_mode='12m'):
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+    if data_mode == '7m':
+        data_mode = '7m'
+        conbeam=None
+        print( 'WARNING: SFR maps come in 12m sizes only.') #(!!!) What about for all the new 15" maps?
+        print( 'WARNING: Convolution forcibly disabled.')
+    elif data_mode in ['12m','12m+7m']:
+        data_mode = '12m+7m'  
+
+    if name=='m33':
+        filename = \
+                'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits'\
+                # Technically not a moment1 map, but it works in this context.
+    else:
+        filename = 'phangsdata/'+name+'_co21_'+data_mode+'+tp_mom1.fits' 
+        
+    if os.path.isfile(filename):
+        if name=='m33':
+            I_mom1 = fits.getdata(filename) /1000.  # In km/s now.
+        else:
+            I_mom1 = fits.getdata(filename)         # In km/s.
+    else:
+        print( "WARNING: No mom1 map found!")
+        I_mom1 = None
+    return I_mom1
+
+def tpeak_get(gal,data_mode='12m'):
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+    if data_mode == '7m':
+        data_mode = '7m'
+        conbeam=None
+        print( 'WARNING: SFR maps come in 12m sizes only.') #(!!!) What about for all the new 15" maps?
+        print( 'WARNING: Convolution forcibly disabled.')
+    elif data_mode in ['12m','12m+7m']:
+        data_mode = '12m+7m'  
+
+    if name=='m33':
+        filename = 'notphangsdata/m33.co21_iram.14B-088_HI.peaktemps.fits'
+    else:
+        filename = 'phangsdata/'+name+'_co21_'+data_mode+'+tp_tpeak.fits'
+    
+    if os.path.isfile(filename):
+        if name=='m33':
+            I_tpeak = fits.getdata(filename)         # In K.
+        else:
+            I_tpeak = fits.getdata(filename)         # In K.
+    else:
+        print( "WARNING: No tpeak map found!")
+        I_tpeak = None
+    return I_tpeak
+
+def hdr_get(gal,data_mode='12m'):
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+    if data_mode == '7m':
+        data_mode = '7m'
+        conbeam=None
+        print( 'WARNING: SFR maps come in 12m sizes only.') #(!!!) What about for all the new 15" maps?
+        print( 'WARNING: Convolution forcibly disabled.')
+    elif data_mode in ['12m','12m+7m']:
+        data_mode = '12m+7m'  
+    
+    hdr = None
+    hdr_found = False
+    if name=='m33':
+        for filename in [\
+        'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits']:
+            if os.path.isfile(filename):
+                hdr = fits.getheader(filename)
+                hdr_found = True
+    else:
+        for filename in [\
+        'phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits',\
+        'phangsdata/'+name+'_co21_'+data_mode+'+tp_mom1.fits',\
+        'phangsdata/'+name+'_co21_'+data_mode+'+tp_tpeak.fits']:
+            if os.path.isfile(filename):
+                hdr = fits.getheader(filename)
+                hdr_found = True
+    if hdr_found == False:
+        print('WARNING: No header was found!')
+        hdr = None
+    return hdr
+
+def sfr_get(gal,hdr=None):
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+
+    if name=='m33':
+        filename = fits.open('notphangsdata/cube.fits')[13]
+    else:
+        filename = 'phangsdata/sfr/'+name+'_sfr_fuvw4.fits'
+    if os.path.isfile(filename):
+        sfr_map = Projection.from_hdu(fits.open(filename))
+    else:
+        print('WARNING: No SFR map was found!')
+        sfr_map = None
+    
+    if hdr!=None:
+        sfr = sfr_map.reproject(hdr) # Msun/yr/kpc^2. See header.
+                                     # https://www.aanda.org/articles/aa/pdf/2015/06/aa23518-14.pdf
+    return sfr
+            
+def cube_get(gal,data_mode):
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+
+    # Spectral Cube
+    if name=='m33':
+        filename = 'notphangsdata/'+name+'.co21_iram.fits'
+    else:
+        filename = 'phangsdata/'+name+'_co21_'+data_mode+'+tp_flat_round_k.fits'
+    if os.path.isfile(filename):
+        cube = SpectralCube.read(filename)
+    else:
+        print('WARNING: No cube was found!')
+        cube = None
+    return cube
+    
+def info(gal,conbeam=None,data_mode='12m'):
     '''
     Returns basic info from galaxies.
     Astropy units are NOT attached to outputs.
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy.
-    conbeam : u.quantity.Quantity
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
+    conbeam=None : u.quantity.Quantity
         Width of the beam in pc or ",
         if you want the output to be
         convolved.
@@ -50,37 +221,38 @@ def info(name,conbeam=None,data_mode='12m'):
     sfr : np.ndarray
         2D map of the SFR, in Msun/kpc^2/yr.
     '''
-    name = name.lower()
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+        
     if data_mode == '7m':
         data_mode = '7m'
         conbeam=None
-        print 'WARNING: SFR maps come in 12m sizes only.'
-        print 'WARNING: Convolution forcibly disabled.'
+        print( 'WARNING: SFR maps come in 12m sizes only.') #(!!!) What about for all the new 15" maps?
+        print( 'WARNING: Convolution forcibly disabled.')
     elif data_mode in ['12m','12m+7m']:
-        data_mode = '12m+7m'
-        
+        data_mode = '12m+7m'  
+    
     if name=='m33':
-        print 'WARNING: Only 12m data available. Also, M33 isn\'t properly supported.'
-        hdr = fits.getheader(\
-                'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')
+        print( 'WARNING: Only 12m data available. Also, M33 isn\'t properly supported.')  
+    
+    I_mom0 = mom0_get(gal,data_mode)
+    I_mom1 = mom1_get(gal,data_mode)
+    I_tpeak = tpeak_get(gal,data_mode)
+    hdr = hdr_get(gal,data_mode)
+    
+    if name=='m33':
         hdr_beam = fits.getheader('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')
             # WARNING: The IRAM .fits files give headers that galaxies.py misinterprets somehow,
             #    causing the galaxy to appear weirdly warped and lopsided.
             #    The peakvels.fits gives accurate data... but does not contain beam information,
             #    so the IRAM one is used for that.
         beam = hdr_beam['BMAJ']
-        I_mom0 = fits.getdata('notphangsdata/m33.co21_iram.14B-088_HI.mom0.fits')/1000. # Now in K km/s.
-        I_mom1 = fits.getdata(\
-                'notphangsdata/M33_14B-088_HI.clean.image.GBT_feathered.pbcov_gt_0.5_masked.peakvels.fits')/1000.
-                # Now in km/s.
-                # Technically not a moment1 map, but it works in this context. (???)
-        I_tpeak = fits.getdata('notphangsdata/m33.co21_iram.14B-088_HI.peaktemps.fits')   # Peak T, in K.
     else:
-        hdr = fits.getheader('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits')
         beam = hdr['BMAJ']                                                    # In degrees.
-        I_mom0 = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom0.fits')    # In K km/s.
-        I_mom1 = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_mom1.fits')    # In km/s.
-        I_tpeak = fits.getdata('phangsdata/'+name+'_co21_'+data_mode+'+tp_tpeak.fits')  # In K.
     
     # Fix the headers so WCS doesn't think that they're 3D!
     if name!='m33':
@@ -92,27 +264,17 @@ def info(name,conbeam=None,data_mode='12m'):
             for j in ['1', '2', '3']:
                 del hdrcopy['PC0'+i+'_0'+j]
         hdr = hdrcopy
-
-    # SFR map
-    if name=='m33':
-        sfr_map = Projection.from_hdu(fits.open('notphangsdata/cube.fits')[13])
-    else:
-        sfr_map = Projection.from_hdu(fits.open('phangsdata/'+name+'_sfr_fuvw4.fits'))
-    sfr = sfr_map.reproject(hdr) # Msun/yr/kpc^2. See header.
-                                 # https://www.aanda.org/articles/aa/pdf/2015/06/aa23518-14.pdf
+    
+    sfr = sfr_get(gal,hdr)
            
-    # Spectral Cube
-    if name=='m33':
-        cube = SpectralCube.read('notphangsdata/'+name+'.co21_iram.fits')
-    else:
-        cube = SpectralCube.read('phangsdata/'+name+'_co21_'+data_mode+'+tp_flat_round_k.fits')
+    cube = cube_get(gal,data_mode)
         
         
     # CONVOLUTION, if enabled:
     if conbeam!=None:
-        hdr,I_mom0, I_tpeak, cube = cube_moments(name,conbeam)    # Convolved moments, with their cube.
+        hdr,I_mom0, I_tpeak, cube = cube_moments(gal,conbeam)    # Convolved moments, with their cube.
         sfr = sfr.reproject(hdr)                                  # The new header might have different res.!
-        sfr = convolve_2D(name,hdr,sfr,conbeam)                  # Convolved SFR map.
+        sfr = convolve_2D(gal,hdr,sfr,conbeam)                  # Convolved SFR map.
     else:
         sfr = sfr.value
 
@@ -211,11 +373,12 @@ def beta_and_depletion_clean(beta,depletion,rad=None,stride=1):
     # Ordering the Rad/Depletion/Beta arrays!
     import operator
     if rad!=None:
-        L = sorted(zip(rad1D.value,beta,depletion), key=operator.itemgetter(0))
-        rad1D,beta,depletion = np.array(zip(*L)[0])*u.pc, np.array(zip(*L)[1]), np.array(zip(*L)[2])
+        L = sorted(zip(np.ravel(rad1D.value),np.ravel(beta),np.ravel(depletion)), key=operator.itemgetter(0))
+        rad1D,beta,depletion = np.array(list(zip(*L))[0])*u.pc, np.array(list(zip(*L))[1]),\
+                               np.array(list(zip(*L))[2])
     else:
-        L = sorted(zip(beta,depletion), key=operator.itemgetter(0))
-        beta,depletion = np.array(zip(*L)[0]), np.array(zip(*L)[1])
+        L = sorted(zip(np.ravel(beta),np.ravel(depletion)), key=operator.itemgetter(0))
+        beta,depletion = np.array(list(zip(*L))[0]), np.array(list(zip(*L))[1])
     
     # Returning everything!
     if rad!=None:
@@ -223,7 +386,7 @@ def beta_and_depletion_clean(beta,depletion,rad=None,stride=1):
     else:
         return beta,depletion
 
-def cube_moments(name,conbeam):
+def cube_moments(gal,conbeam):
     '''
     Extracts the mom0 and tpeak maps from
         a convolved data cube.
@@ -233,8 +396,9 @@ def cube_moments(name,conbeam):
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy.
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
     conbeam : float
         Convolution beam width, in pc 
         OR arcsec. Must specify units!
@@ -253,6 +417,14 @@ def cube_moments(name,conbeam):
         convolved to the resolution indicated
         by "conbeam".
     '''
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+
+
     resolutions = np.array([60,80,100,120,500,750,1000])*u.pc   # Available pre-convolved resolutions,
                                                                 #    in PHANGS-ALMA-v1p0
     # Units for convolution beamwidth:
@@ -294,21 +466,22 @@ def cube_moments(name,conbeam):
             cubec.allow_huge_operations=True
         else:
             raise ValueError(filename+' does not exist.')
-        print "IMPORTANT NOTE: This uses pre-convolved .fits files from Drive."
+        print( "IMPORTANT NOTE: This uses pre-convolved .fits files from Drive.")
         I_mom0c_DUMMY = cubec.moment0().to(u.K*u.km/u.s)
         hdrc = I_mom0c_DUMMY.header
         
     return hdrc,I_mom0c.value, I_tpeakc.value, cubec
 
-def convolve_2D(name,hdr,map2d,conbeam):
+def convolve_2D(gal,hdr,map2d,conbeam):
     '''
     Returns 2D map (e.g. SFR), convolved 
     to a beam width "conbeam".
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy.
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
     hdr : fits.header.Header
         Header for the galaxy.
     map2d : np.ndarray
@@ -325,7 +498,14 @@ def convolve_2D(name,hdr,map2d,conbeam):
     map2d_convolved : np.ndarray
         The same map, convolved.
     '''
-    gal = Galaxy(name.upper())
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+        gal = Galaxy(name.upper())
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+    
     if conbeam.unit in {u.pc, u.kpc, u.Mpc}:
         conbeam_width = conbeam.to(u.pc)                         # Beam width, in pc.
         conbeam_angle = conbeam / gal.distance.to(u.pc) * u.rad  # Beam width, in radians.
@@ -342,7 +522,7 @@ def convolve_2D(name,hdr,map2d,conbeam):
     
     pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))[0]*u.deg # The size of each pixel, in deg.
     conbeam_pixwidth = conbeam_angle / pixsizes_deg  # Beam width, in pixels.
-#     print "Pixel width of beam: "+str(conbeam_pixwidth)+" pixels."
+#     print( "Pixel width of beam: "+str(conbeam_pixwidth)+" pixels.")
     
     gauss = Gaussian2DKernel(conbeam_pixwidth)
     map2d_convolved = convolve_fft(map2d,gauss,normalize_kernel=True)
@@ -383,7 +563,7 @@ def convolve_cube(gal,cube,conbeam):
         raise ValueError("'beam' must have units of pc or arcsec.")
     
     bm = Beam(major=conbeam_angle,minor=conbeam_angle)    # Actual "beam" object, used for convolving cubes
-    print bm
+    print( bm)
     
     # Convolve the cube!
     cube = cube.convolve_to(bm)
@@ -393,10 +573,10 @@ def convolve_cube(gal,cube,conbeam):
         filename = 'notphangsdata/cube_convolved/'+name.lower()+'.co21_iram_'+conbeam_filename+'.fits'
     else:
         filename = 'phangsdata/cube_convolved/'+name.lower()+'_co21_12m+7m+tp_flat_round_k_'+conbeam_filename+'.fits'
-    print filename
+    print( filename)
     if os.path.isfile(filename):
         os.remove(filename)
-        print filename+" has been overwritten."
+        print( filename+" has been overwritten.")
     cube.write(filename)
     
     return cube

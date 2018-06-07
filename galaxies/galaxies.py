@@ -250,9 +250,9 @@ class Galaxy(object):
             frequency.    
         mode : str
             'PHANGS'      - Uses PHANGS rotcurve.
-            'DiskFit_12m' - Uses fitted rotcurve from
+            'diskfit12m' - Uses fitted rotcurve from
                             12m+7m data.        
-            'DiskFit_7m'  - Uses fitted rotcurve from
+            'diskfit7m'  - Uses fitted rotcurve from
                             7m data.
             
         Returns:
@@ -277,18 +277,18 @@ class Galaxy(object):
                 R = m33['r']
                 vrot = m33['Vt']
                 vrot_e = None
-                print "WARNING: M33 rotcurve error bars not accounted for!"
+                print( "WARNING: M33 rotcurve error bars not accounted for!")
             else:
                 fname = "phangsdata/"+self.name.lower()+"_co21_12m+7m+tp_RC.txt"
                 R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
-        elif mode.lower()=='diskfit_12m':
+        elif mode.lower()=='diskfit12m':
             fname = "diskfit/rotcurves/"+self.name.lower()+"_co21_12m+7m_RC.txt"
             R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
-        elif mode.lower()=='diskfit_7m':
+        elif mode.lower()=='diskfit7m':
             fname = "diskfit/rotcurves/"+self.name.lower()+"_co21_7m_RC.txt"
             R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
         else:
-            raise ValueError("'mode' must be PHANGS, diskfit_12m, or diskfit_7m!")
+            raise ValueError("'mode' must be PHANGS, diskfit12m, or diskfit7m!")
             
             # R = Radius from center of galaxy, in arcsec.
             # vrot = Rotational velocity, in km/s.
@@ -365,7 +365,7 @@ class Galaxy(object):
         
         # SMOOTHING:
         if smooth==None or smooth.lower()=='none':
-            print "WARNING: Smoothing disabled!"
+            print( "WARNING: Smoothing disabled!")
         elif smooth.lower()=='spline':
             # BSpline of vrot(R)
             vrot = bspline(R,vrot(R),knots=knots,lowclamp=True)
@@ -383,7 +383,7 @@ class Galaxy(object):
             params, params_covariance = optimize.curve_fit(\
                                             vcirc_brandt,R_e,vrot(R_e),p0=(1,1,1),sigma=vrot_e,\
                                             bounds=((0.5,0,0),(np.inf,np.inf,np.inf)))
-            print "n,vmax,rmax = "+str(params)
+            print( "n,vmax,rmax = "+str(params))
             vrot_b = vcirc_brandt(R,params[0],params[1],params[2])  # Array.
 
             # BSpline interpolation of vrot_s(R)
@@ -403,7 +403,7 @@ class Galaxy(object):
             params, params_covariance = optimize.curve_fit(\
                                             vcirc_universal,R_e,vrot(R_e),p0=(1,1,600),sigma=vrot_e,\
                                             bounds=((0,0.01,0),(np.inf,np.inf,np.inf)))
-            print "v0,a,rmax = "+str(params)
+            print( "v0,a,rmax = "+str(params))
             vrot_u = vcirc_universal(R,params[0],params[1],params[2])  # Array.
 
             # BSpline interpolation of vrot_u(R)
@@ -421,7 +421,7 @@ class Galaxy(object):
             params, params_covariance = optimize.curve_fit(\
                                             vcirc_simple,R_e,vrot(R_e),p0=(1,1000),sigma=vrot_e,\
                                             bounds=((0,0.01),(np.inf,np.inf)))
-            print "vflat,rflat = "+str(params)
+            print( "vflat,rflat = "+str(params))
             vrot_s = vcirc_simple(R,params[0],params[1])  # Array.
 
             # BSpline interpolation of vrot_u(R)
