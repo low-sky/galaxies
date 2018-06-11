@@ -19,9 +19,17 @@ def parse_galtable(galobj,name):
                                        package='galaxies')
     galtable = Table.read(table_name)
     hits = [x for x in galtable if name in x['ALIAS']]
-
-    if len(hits)==1:
-        thisobj = hits[0]
+    if len(hits)>0:
+        if len(hits)>1:
+            exact = np.zeros(len(hits),dtype=np.bool)
+            for i, h in enumerate(hits):
+                exact[i] = np.any([n==name for n in h['ALIAS'].split(';')])
+            if np.sum(exact)==1:
+                thisobj = hits[(np.where(exact))[0][0]]
+            else:
+                raise Exception
+        else:
+            thisobj = hits[0]
         galobj.name = thisobj['NAME'].strip()
         galobj.vsys = thisobj['VRAD_KMS'] * u.km / u.s
         galobj.center_position = SkyCoord(
@@ -95,7 +103,16 @@ class Galaxy(object):
                 except:
                     warnings.warn("Unsuccessful query to NED")
                     pass
-
+            if name.upper() == 'M51':
+                self.name = 'M51'
+                self.distance = 7.6 * u.Mpc
+                self.center_position = SkyCoord(
+                     202.46954345703125, 47.19514846801758,
+                    unit=(u.deg, u.deg), frame='fk5')
+                self.position_angle=Angle(172.0 * u.deg)
+                self.inclination = Angle(20 * u.deg)
+                self.velocity = 463.0 * u.km / u.s
+                self.provenance = 'Override'
             if name.upper() == 'M33':
                 self.name = 'M33'
                 self.distance = 8.4e5 * u.pc
