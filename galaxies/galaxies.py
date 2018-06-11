@@ -23,11 +23,11 @@ def parse_galtable(galobj,name):
         if len(hits)>1:
             exact = np.zeros(len(hits),dtype=np.bool)
             for i, h in enumerate(hits):
-                exact[i] = np.any([n==name for n in h['ALIAS'].split(';')])
+                exact[i] = np.any([n.strip()==name for n in h['ALIAS'].split(';')])
             if np.sum(exact)==1:
                 thisobj = hits[(np.where(exact))[0][0]]
             else:
-                raise Exception
+                raise Exception("More than one exact match in galbase")
         else:
             thisobj = hits[0]
         galobj.name = thisobj['NAME'].strip()
