@@ -105,7 +105,7 @@ class Galaxy(object):
                     pass
             if name.upper() == 'M51':
                 self.name = 'M51'
-                self.distance = 7.6 * u.Mpc
+                self.distance = 8.36 * u.Mpc
                 self.center_position = SkyCoord(
                      202.46954345703125, 47.19514846801758,
                     unit=(u.deg, u.deg), frame='fk5')
@@ -115,7 +115,7 @@ class Galaxy(object):
                 self.provenance = 'Override'
             if name.upper() == 'M33':
                 self.name = 'M33'
-                self.distance = 8.4e5 * u.pc
+                self.distance = 9.2e5 * u.pc
                 self.center_position = \
                     SkyCoord(23.4607, 30.6583, unit=(u.deg, u.deg),
                              frame='fk5')
@@ -130,32 +130,12 @@ class Galaxy(object):
                 self.inclination = Angle(24 * u.deg)
                 self.velocity = 514 * u.km / u.s
                 self.provenance = 'Override'
-            elif name.upper() == 'NGC4303':
-                self.name = 'NGC4303'
-                self.distance = 11.6 * u.Mpc
-                self.position_angle = Angle(0 * u.deg)
-                self.inclination = Angle(18 * u.deg)
-                self.velocity = 1569 * u.km / u.s
-                self.provenance = 'Override'
-            elif name.upper() == 'M100':
-                self.name = 'M100'
-                self.distance = 14.3e6 * u.pc
-    #            self.center_position = SkyCoord(23.461667,30.660194,unit=(u.deg,u.deg),frame='fk5')
-                self.position_angle = Angle(153 * u.deg)
-                self.inclination = Angle(30 * u.deg)
-                self.velocity = 1575 * u.km / u.s
-                self.provenance = 'Override'
             elif name.upper() == 'M64':
                 self.name = 'M64'
                 self.distance = 4.1e6 * u.pc
                 self.position_angle = Angle(-67.6 * u.deg)
                 self.inclination = Angle(58.9 * u.deg)
                 self.velocity = 411.3 * u.km / u.s
-                self.provenance = 'Override'
-            elif name.upper() == 'NGC1672':
-                self.name = 'NGC1672'
-                self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
-                #self.position_angle = Angle(170 * u.deg)
                 self.provenance = 'Override'
             elif name.upper() == 'NGC4535':
                 self.name = 'NGC4535'
@@ -168,8 +148,44 @@ class Galaxy(object):
             elif name.upper() == 'IC5332':
                 self.position_angle = Angle(0 * u.deg)
                 self.provenance = 'Override'
-
-                #            else:
+            # PHANGS Overrides from Sun et al. 2018
+            elif name.upper() == 'NGC0628':
+                self.distance = 9.0 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC1672':
+                self.distance = 11.9 * u.Mpc
+                self.position_angle = Angle(124. * u.deg)
+                #http://iopscience.iop.org/article/10.1086/306781/pdf
+                #self.position_angle = Angle(170 * u.deg)
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC2835':
+                self.distance == 10.1 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC3351':
+                self.distance == 10.0 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC3627':
+                self.distance == 8.28 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC4254':
+                self.distance == 16.8 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC4303':
+                self.provenance = 'Override'
+                self.distance == 17.6 * u.Mpc
+            elif name.upper() == 'NGC4321':
+                self.provenance = 'Override'
+                self.distance == 15.2 * u.Mpc
+            elif name.upper() == 'NGC4535':
+                self.provenance = 'Override'
+                self.distance == 15.8 * u.Mpc
+            elif name.upper() == 'NGC5068':
+                self.provenance = 'Override'
+                self.distance == 9.0 * u.Mpc
+                self.position_angle = Angle(110 * u.deg)
+            elif name.upper() == 'NGC6744':
+                self.provenance = 'Override'
+                self.distance == 11.6 * u.Mpc
 
             if not self.provenance:
                 raise ValueError("The information for galaxy {}".format(name)+
