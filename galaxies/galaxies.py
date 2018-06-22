@@ -144,7 +144,7 @@ class Galaxy(object):
                 self.position_angle = Angle(153 * u.deg)
                 self.inclination = Angle(30 * u.deg)
                 self.velocity = 1575 * u.km / u.s
-                self.provenance = 'Override
+                self.provenance = 'Override'
             elif name.upper() == 'M64':
                 self.name = 'M64'
                 self.distance = 4.1e6 * u.pc
