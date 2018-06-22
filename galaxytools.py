@@ -13,7 +13,7 @@ from radio_beam import Beam
 from scipy import interpolate
 
 from galaxies.galaxies import Galaxy
-import rotcurve_interp as rc
+import rotcurve_tools as rc
 
 import copy
 import os
@@ -163,10 +163,13 @@ def sfr_get(gal,hdr=None):
     else:
         print('WARNING: No SFR map was found!')
         sfr_map = None
+        return sfr_map
     
     if hdr!=None:
         sfr = sfr_map.reproject(hdr) # Msun/yr/kpc^2. See header.
                                      # https://www.aanda.org/articles/aa/pdf/2015/06/aa23518-14.pdf
+    else:
+        sfr = sfr_map
     return sfr
             
 def cube_get(gal,data_mode):
@@ -203,6 +206,9 @@ def info(gal,conbeam=None,data_mode='12m'):
         Width of the beam in pc or ",
         if you want the output to be
         convolved.
+    data_mode='12m' or '7m' : str
+        Chooses either 12m data or 7m
+        data.
         
     Returns:
     --------
@@ -272,9 +278,9 @@ def info(gal,conbeam=None,data_mode='12m'):
         
     # CONVOLUTION, if enabled:
     if conbeam!=None:
-        hdr,I_mom0, I_tpeak, cube = cube_moments(gal,conbeam)    # Convolved moments, with their cube.
-        sfr = sfr.reproject(hdr)                                  # The new header might have different res.!
-        sfr = convolve_2D(gal,hdr,sfr,conbeam)                  # Convolved SFR map.
+        hdr,I_mom0, I_tpeak, cube = cube_moments(gal,conbeam)    # CONVOLVED moments, with their cube.
+#         sfr = sfr.reproject(hdr)                                  # It was reprojected already.
+        sfr = convolve_2D(gal,hdr,sfr,conbeam)  # Convolved SFR map.
     else:
         sfr = sfr.value
 
@@ -385,6 +391,97 @@ def beta_and_depletion_clean(beta,depletion,rad=None,stride=1):
         return beta, depletion, rad1D
     else:
         return beta,depletion
+
+def sigmas(gal,hdr=None,beam=None,I_mom0=None,I_tpeak=None,alpha=6.7,mode=''):
+    '''
+    Returns things like 'sigma' (line width, in km/s)
+    or 'Sigma' (surface density) for a galaxy. The
+    header, beam, and moment maps must be provided.
+    
+    Parameters:
+    -----------
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
+    hdr=None : astropy.io.fits.header.Header
+        Header for the galaxy.
+        Will be found automatically if not
+        specified.
+    beam=None : float
+        Beam width, in deg.
+        Will be found automatically if not
+        specified.
+    I_mom0=None : np.ndarray
+        0th moment, in K km/s.
+        Will be found automatically if not
+        specified.
+    I_tpeak=None : np.ndarray
+        Peak temperature, in K.
+        Will be found automatically if not
+        specified.
+    alpha=6.7 : float
+        CO(2-1) to H2 conversion factor,
+        in (Msun pc^-2) / (K km s^-1).
+    mode='' : str
+        'sigma' - returns linewidth.
+        'Sigma' - returns H2 surface density.
+
+    Returns:
+    --------
+    rad : np.ndarray
+        Radius array.
+    (s/S)igma : np.ndarray
+        Maps for line width and H2 surface 
+        density, respectively.
+    '''
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+        gal = Galaxy(name.upper())
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+    
+    # Header
+    if hdr==None:
+        print('galaxytools.sigmas(): WARNING: Header found automatically. Check that it\'s correct!')
+        hdr = hdr_get(gal)
+    # Beam width
+    if beam==None:
+        beam = hdr['BMAJ']
+    if I_mom0 is None:
+        print('galaxytools.sigmas(): I_mom0 found automatically.')
+        I_mom0 = mom0_get(gal)
+    if I_tpeak is None:
+        print('galaxytools.sigmas(): I_tpeak found automatically.')
+        I_tpeak = tpeak_get(gal)
+        
+    x, rad, x, x = gal.rotmap(header=hdr)
+    d = gal.distance
+    d = d.to(u.pc)                                          # Converts d from Mpc to pc.
+
+    # Pixel sizes
+    pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))*u.deg # The size of each pixel, in degrees. 
+                                                                         # Ignore that third dimension; that's 
+                                                                         # pixel size for the speed.
+    pixsizes = pixsizes_deg[0].to(u.rad)                    # Pixel size, in radians.
+    pcperpixel =  pixsizes.value*d                          # Number of parsecs per pixel.
+    pcperdeg = pcperpixel / pixsizes_deg[0]
+
+    # Beam
+    beam = beam * pcperdeg                                  # Beam size, in pc
+
+    # Line width, Surface density
+    #alpha = 6.7  # (???) Units: (Msun pc^-2) / (K km s^-1)
+    sigma = I_mom0 / (np.sqrt(2*np.pi) * I_tpeak)
+    Sigma = alpha*I_mom0   # (???) Units: Msun pc^-2
+    
+    if mode=='sigma':
+        return rad, sigma
+    elif mode=='Sigma':
+        return rad, Sigma
+    else:
+        print( "SELECT A MODE.")
 
 def cube_moments(gal,conbeam):
     '''

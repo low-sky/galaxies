@@ -1,22 +1,24 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import math
-from scipy import ndimage, misc, interpolate, optimize
-from scipy.interpolate import BSpline, make_lsq_spline
 
 import astropy.io.fits as fits
 import astropy.units as u
 import astropy.wcs as wcs
-from astropy.table import Table
-from spectral_cube import SpectralCube
+from astropy.wcs import WCS
 from galaxies.galaxies import Galaxy
 
+from scipy import ndimage, misc, interpolate, optimize
+from scipy.interpolate import BSpline, make_lsq_spline
 from pandas import DataFrame, read_csv
 import pandas as pd
-import statsmodels.formula.api as smf
+
+# Import my own code
+import galaxytools as tools
 
 
-def rotcurve(name,smooth='spline',knots=8):
+def rotcurve(gal,mode='PHANGS',
+#              rcdir='/mnt/bigdata/PHANGS/OtherData/derived/Rotation_curves/'):
+             rcdir='/media/jnofech/BigData/galaxies/rotcurves/'):
     '''
     Reads a provided rotation curve table and
     returns interpolator functions for rotational
@@ -25,20 +27,11 @@ def rotcurve(name,smooth='spline',knots=8):
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy that we care about.
-    smooth : str
-        Determines smoothing for rotation curve.
-        Available modes:
-        'none'   (not recommended)
-        'spline' (DEFAULT; uses specified # of knots)
-        'brandt' (the analytical model)
-    knots : int
-        Number of internal knots in BSpline of
-        vrot, which is used to calculate epicyclic
-        frequency.
-    mode : str
-        'PHANGS'      - Uses PHANGS rotcurve.
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
+    mode='PHANGS' : str
+        'PHANGS'     - Uses PHANGS rotcurve.
         'diskfit12m' - Uses fitted rotcurve from
                         12m+7m data.        
         'diskfit7m'  - Uses fitted rotcurve from
@@ -55,42 +48,46 @@ def rotcurve(name,smooth='spline',knots=8):
         1D array of original rotcurve radii, in pc.
     vrot_e : np.ndarray
         1D array of original rotcurve errors, in pc.
-    k : scipy.interpolate.interp1d
-        Function for the interpolated epicyclic
-        frequency.
     '''
     
-    # Basic info
-    gal = Galaxy(name.upper())
-    d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
+    # Do not include in galaxies.py!
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+        gal = Galaxy(name.upper())
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
     
+
+    d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc   
     
-    
+    rcdir_jnofech = '/media/jnofech/BigData/galaxies/rotcurves/'     # Joseph's main rotcurve directory,
+                                                                     #   including the ones on the server.
     # Rotation Curves
     if mode.lower()=='phangs':
-        if name=='m33':
+        if gal.name.lower()=='m33':
             m33 = pd.read_csv('notphangsdata/m33_rad.out_fixed.csv')
             R = m33['r']
             vrot = m33['Vt']
             vrot_e = None
             print( "WARNING: M33 rotcurve error bars not accounted for!")
         else:
-            fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC.txt"
+            fname = rcdir+(rcdir==rcdir_jnofech)*'phangs/'+name.lower()+"_co21_12m+7m+tp_RC.txt"
             R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
     elif mode.lower()=='diskfit12m':
-        fname = "diskfit/rotcurves/"+name.lower()+"_co21_12m+7m_RC.txt"
+        fname = rcdir+'diskfit12m/'+name.lower()+"_co21_12m+7m_RC.txt"    # Not on server.
         R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
     elif mode.lower()=='diskfit7m':
-        fname = "diskfit/rotcurves/"+name.lower()+"_co21_7m_RC.txt"
+        fname = rcdir+'diskfit7m/'+name.lower()+"_co21_7m_RC.txt"         # Not on server.
         R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
     else:
         raise ValueError("'mode' must be PHANGS, diskfit12m, or diskfit7m!")
-#         fname = "phangsdata/"+name.lower()+"_co21_12m+7m+tp_RC_OLD.txt"
-#         R, vrot = np.loadtxt(fname,skiprows=True,unpack=True)
+
         # R = Radius from center of galaxy, in arcsec.
         # vrot = Rotational velocity, in km/s.
     # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are 
-    #     treated as unitless!
+    #     floats!
     
     # Units & conversions
     R = R*u.arcsec
@@ -100,27 +97,68 @@ def rotcurve(name,smooth='spline',knots=8):
     R_e = np.copy(R)           # Radius, corresponding to error bars.
     
     # Adding a (0,0) data point to rotation curve
-    if R[0]!=0:
-        R = np.roll(np.concatenate((R,[0]),0),1)
-        vrot = np.roll(np.concatenate((vrot,[0]),0),1)
+#     if R[0]!=0:
+#         R = np.roll(np.concatenate((R,[0]),0),1)
+#         vrot = np.roll(np.concatenate((vrot,[0]),0),1)
     
     
     
     # BSpline interpolation of vrot(R)
     K=3                # Order of the BSpline
     t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
-    vrot = interpolate.BSpline(t,c,k, extrapolate=True)     # Cubic interpolation of vrot(R).
+    vrot = interpolate.BSpline(t,c,k, extrapolate=False)     # Cubic interpolation of vrot(R).
                                                             # 'vrot' is now a function, not an array.
     # Creating "higher-resolution" rotation curve
     Nsteps = 10000
     R = np.linspace(R.min(),R.max(),Nsteps)
+    
+    
+    return R, vrot, R_e, vrot_e
+    
+def rotcurve_smooth(R,vrot,R_e,vrot_e=None,smooth='spline',knots=8):
+    '''
+    Takes a provided rotation curve
+    and smooths it based on one of
+    several models.
+    
+    Parameters:
+    -----------
+    R : np.ndarray
+        1D array of radii of galaxy, in pc.
+    vrot : scipy.interpolate._bsplines.BSpline
+        Function for the interpolated rotation
+        curve, in km/s.
+    R_e=None : np.ndarray
+        1D array of original rotcurve radii, in pc.
+    vrot_e=None : np.ndarray
+        1D array of original rotcurve errors, in pc.
+    smooth='spline' : str
+        Determines smoothing for rotation curve.
+        Available modes:
+        'none'   (not recommended)
+        'spline' (DEFAULT; uses specified # of knots)
+        'brandt' (an analytical model)
+        'universal' (Persic & Salucci 1995)
+    knots=8 : int
+        Number of internal knots in BSpline of
+        vrot, if mode=='spline'.
+        
+        
+    Returns:
+    --------
+    R : np.ndarray
+        1D array of radii of galaxy, in pc.
+    vrot : scipy.interpolate._bsplines.BSpline
+        SMOOTHED function for the interpolated
+        rotation curve, in km/s.
+    '''
     
     # SMOOTHING:
     if smooth==None or smooth.lower()=='none':
         print( "WARNING: Smoothing disabled!")
     elif smooth.lower()=='spline':
         # BSpline of vrot(R)
-        vrot = bspline(R,vrot(R),knots=knots,lowclamp=True)
+        vrot = bspline(R,vrot(R),knots=knots,lowclamp=False)
     elif smooth.lower()=='brandt':
         def vcirc_brandt(r, *pars):
             '''
@@ -132,13 +170,13 @@ def rotcurve(name,smooth='spline',knots=8):
             denom = np.power((1 / 3.) + (2 / 3.) *\
                     np.power(r / rmax, n), (3 / (2 * n)))
             return numer / denom
-        params, params_covariance = scipy.optimize.curve_fit(\
+        params, params_covariance = optimize.curve_fit(\
                                         vcirc_brandt,R_e,vrot(R_e),p0=(1,1,1),sigma=vrot_e,\
                                         bounds=((0.5,0,0),(np.inf,np.inf,np.inf)))
         print( "n,vmax,rmax = "+str(params))
         vrot_b = vcirc_brandt(R,params[0],params[1],params[2])  # Array.
 
-        # BSpline interpolation of vrot_s(R)
+        # BSpline interpolation of vrot_b(R)
         K=3                # Order of the BSpline
         t,c,k = interpolate.splrep(R,vrot_b,s=0,k=K)
         vrot = interpolate.BSpline(t,c,k, extrapolate=True)  # Now it's a function.
@@ -183,39 +221,79 @@ def rotcurve(name,smooth='spline',knots=8):
     else:
         raise ValueError('Invalid smoothing mode.')
     
+    return R, vrot
+
+def epicycles(R,vrot):
+    '''
+    Returns the epicyclic frequency from a
+    given rotation curve.
+    
+    Parameters:
+    -----------
+    R : np.ndarray
+        1D array of radii of galaxy, in pc.
+    vrot : scipy.interpolate._bsplines.BSpline
+        Function for the interpolated
+        rotation curve, in km/s.
+        Smoothing is recommended!
+        
+        
+    Returns:
+    --------
+    k : scipy.interpolate.interp1d
+        Function for the interpolated epicyclic
+        frequency.
+    '''
     # Epicyclic Frequency
     dVdR = np.gradient(vrot(R),R)
     k2 =  2.*(vrot(R)**2 / R**2 + vrot(R)/R*dVdR)
     k = interpolate.interp1d(R,np.sqrt(k2))
     
-    
-    return R, vrot, R_e, vrot_e, k     # NOTE: Here, 'vrot' may or may not be smoothed.
+    return k
     
 
-def rotmap(name,header=None):
+def rotmap(gal,header,mode='PHANGS'):
     '''
-    Returns "observed velocity" map, and "rotation
+    Returns "observed velocity" map, and "radius
     map". (The latter is just to make sure that the
     code is working properly.)
-    WARNING: Only works for NGC1672 at the moment.
     
     Parameters:
     -----------
-    name : str
-        Name of the galaxy that we care about.
+    gal : str OR Galaxy
+        Name of galaxy, OR Galaxy
+        object.
+    header : astropy.io.fits.header.Header
+        Header for the galaxy.
+    mode='PHANGS' : str
+        'PHANGS'     - Uses PHANGS rotcurve.
+        'diskfit12m' - Uses fitted rotcurve from
+                        12m+7m data.        
+        'diskfit7m'  - Uses fitted rotcurve from
+                        7m data.
         
     Returns:
     --------
     vobs : np.ndarray
         Map of observed velocity, in km/s.
-    R : np.ndarray
-        Map of radii of galaxy, in pc.
+    rad : np.ndarray
+        Map of radii in disk plane, up to
+        extent of the rotcurve; in pc.
     Dec, RA : np.ndarray
         2D arrays of the ranges of Dec and 
         RA (respectively), in degrees.
     '''    
     # Basic info
-    gal = Galaxy(name)
+    
+    # Do not include in galaxies.py!
+    if isinstance(gal,Galaxy):
+        name = gal.name.lower()
+    elif isinstance(gal,str):
+        name = gal.lower()
+        gal = Galaxy(name.upper())
+    else:
+        raise ValueError("'gal' must be a str or galaxy!")
+    
     vsys = gal.vsys
     if vsys==None:
         vsys = gal.velocity
@@ -228,7 +306,7 @@ def rotmap(name,header=None):
     d = (gal.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
 
     # vrot Interpolation
-    R_1d, vrot, R_e, vrot_e, k_discard = rotcurve(name,smooth=None)  # Creates "vrot" interpolation function, and 1D array of R.
+    R_1d, vrot,R_e,vrot_e = rotcurve(name,mode=mode)  # Creates "vrot" interpolation function, and 1D array of R.
 
 
     # Generating displayable grids
@@ -239,18 +317,18 @@ def rotmap(name,header=None):
     #       - X- and Y-axes are exactly 90 degrees apart, which is only true for when X is parallel (or perp.)
     #               to the line of nodes.
 
-    R = np.sqrt(X**2 + Y**2)                     # Grid of radius in parsecs.
-    R = (R.value<R_1d.max()).astype(int) * R  
-    R[ R==0 ] = np.nan                           # Grid of radius, with values outside interpolation range removed.
+    rad = np.sqrt(X**2 + Y**2)                     # Grid of radius in parsecs.
+    rad = ( (rad.value<R_1d.max()) * (rad.value>R_1d.min())).astype(int) * rad  
+    rad[ rad==0 ] = np.nan                         # Grid of radius, with values outside interpolation range removed.
 
     skycoord = gal.skycoord_grid(header=header)     # Coordinates (RA,Dec) of the above grid at each point, in degrees.
     RA = skycoord.ra                             # Grid of RA in degrees.
     Dec = skycoord.dec                           # Grid of Dec in degrees.
 
 
-    vobs = (vsys.value + vrot(R)*np.sin(I)*np.cos( np.arctan2(Y,X) )) * (u.km/u.s)
+    vobs = (vsys.value + vrot(rad)*np.sin(I)*np.cos( np.arctan2(Y,X) )) * (u.km/u.s)
     
-    return vobs, R, Dec, RA
+    return vobs, rad, Dec, RA
 
 def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     '''
@@ -301,7 +379,7 @@ def bspline(X,Y,knots=8,k=3,lowclamp=False, highclamp=False):
     
     return spl
 
-def localshear(gal,smooth='spline',knots=8,mode='PHANGS'):
+def localshear(R,vrot):
     '''
     Returns the local shear parameter (i.e. the
     Oort A constant) for a galaxy with a provided
@@ -310,44 +388,20 @@ def localshear(gal,smooth='spline',knots=8,mode='PHANGS'):
     
     Parameters:
     -----------
-    gal : str OR Galaxy
-        Name of galaxy, OR Galaxy
-        object.
-    smooth : str
-        Determines smoothing for rotation curve.
-        Available modes:
-        'none'   (not recommended)
-        'spline' (DEFAULT; uses specified # of knots)
-        'brandt' (the analytical model)
-        'universal' (Persic & Salucci 1995)
-    knots : int
-        Number of INTERNAL knots in BSpline
-        representation of rotation curve.
-    mode : str
-        'PHANGS'      - Uses PHANGS rotcurve.
-        'DiskFit12m'  - Uses fitted rotcurve from
-                        12m+7m data.        
-        'DiskFit7m'   - Uses fitted rotcurve from
-                        7m data.
+    R : np.ndarray
+        1D array of radii of galaxy, in pc.
+    vrot : scipy.interpolate._bsplines.BSpline
+        Function for the interpolated
+        rotation curve, in km/s.
+        Smoothing is recommended!
                         
     Returns:
     --------
     A : scipy.interpolate._bsplines.BSpline
         Oort A "constant", as a function of 
         radius R, in km/s/kpc.
-    '''
-    if isinstance(gal,Galaxy):
-        name = gal.name.lower()
-    elif isinstance(gal,str):
-        name = gal.lower()
-        gal = Galaxy(name.upper())
-    else:
-        raise ValueError("'gal' must be a str or galaxy!")
-    
-    # Use "interp" to generate R, vrot (smoothed).
-    R, vrot, R_e, vrot_e, k_discard = gal.rotcurve(smooth=smooth, knots=knots,mode=mode)
-    
-    # Oort A constant.
+    '''    
+    # Oort A versus radius.
     Omega = vrot(R) / R     # Angular velocity.
     dOmegadR = np.gradient(Omega,R)
     A = (-1./2. * R*dOmegadR )*(u.kpc.to(u.pc)) # From km/s/pc to km/s/kpc.
@@ -355,7 +409,7 @@ def localshear(gal,smooth='spline',knots=8,mode='PHANGS'):
     
     return A
 
-def linewidth_iso(gal,beam,smooth='spline',knots=8,mode='PHANGS'):
+def linewidth_iso(gal,beam=None,smooth='spline',knots=8,mode='PHANGS'):
     '''
     Returns the effective LoS velocity dispersion
     due to the galaxy's rotation, sigma_gal, for
@@ -366,22 +420,24 @@ def linewidth_iso(gal,beam,smooth='spline',knots=8,mode='PHANGS'):
     gal : str OR Galaxy
         Name of galaxy, OR Galaxy
         object.
-    beam : float
+    beam=None : float
         Beam width, in deg.
-    smooth : str
+        Will be found automatically if not
+        specified.
+    smooth='spline' : str
         Determines smoothing for rotation curve.
         Available modes:
         'none'   (not recommended)
         'spline' (DEFAULT; uses specified # of knots)
         'brandt' (the analytical model)
         'universal' (Persic & Salucci 1995)
-    knots : int
+    knots=8 : int
         Number of INTERNAL knots in BSpline
         representation of rotation curve, which
         is used in calculation of epicyclic
         frequency (and, therefore, sigma_gal).    
-    mode : str
-        'PHANGS'      - Uses PHANGS rotcurve.
+    mode='PHANGS' : str
+        'PHANGS'     - Uses PHANGS rotcurve.
         'diskfit12m' - Uses fitted rotcurve from
                         12m+7m data.        
         'diskfit7m'  - Uses fitted rotcurve from
@@ -389,11 +445,9 @@ def linewidth_iso(gal,beam,smooth='spline',knots=8,mode='PHANGS'):
         
     Returns:
     --------
-    R : np.ndarray
-        Radius array.
     sigma_gal : scipy.interpolate._bsplines.BSpline
         Interpolation function for sigma_gal that
-        works over R.
+        works over radius R.
     '''
     if isinstance(gal,Galaxy):
         name = gal.name.lower()
@@ -404,13 +458,17 @@ def linewidth_iso(gal,beam,smooth='spline',knots=8,mode='PHANGS'):
         raise ValueError("'gal' must be a str or galaxy!")
     
     # Beam width
-  
+    if beam==None:
+        print('rc.linewidth_iso(): Beam size found automatically.')
+        hdr = tools.hdr_get(gal)
+        beam = hdr['BMAJ']
     beam = beam*u.deg.to(u.rad)                 # Beam size, in radians
     d = (gal.distance).to(u.pc)
     Rc = beam*d / u.rad                         # Beam size, in parsecs
     
-    # Use "interp" to generate R, vrot (smoothed), k.
-    R, vrot, R_e, vrot_e, k = gal.rotcurve(smooth=smooth,knots=knots,mode=mode)
+    # Use "interp" to generate R, vrot (smoothed), k (epicyclic frequency).
+    R, vrot, R_e, vrot_e = gal.rotcurve(mode=mode)
+    k = epicycles(R,vrot)
     
     # Calculate sigma_gal = kappa*Rc
     sigma_gal = k(R)*Rc
@@ -428,73 +486,6 @@ def linewidth_iso(gal,beam,smooth='spline',knots=8,mode='PHANGS'):
     #t,c,k = interpolate.splrep(R,sigma_gal,s=0,k=K)
     #sigma_gal_spline = interpolate.BSpline(t,c,k, extrapolate=False)     # Cubic interpolation of sigma_gal(R).
     
-    return R, sigma_gal
+    return sigma_gal
 
-def moments(gal,hdr,beam,I_mom0,I_tpeak,alpha=6.7,mode=''):
-    '''
-    Returns things like 'sigma' (line width, in km/s)
-    or 'Sigma' (surface density) for a galaxy. The
-    header, beam, and moment maps must be provided.
-    
-    Parameters:
-    -----------
-    gal : str OR Galaxy
-        Name of galaxy, OR Galaxy
-        object.
-    hdr : astropy.io.fits.header.Header
-        Header for the galaxy.
-    beam : float
-        Beam width, in deg.
-    I_mom0 : np.ndarray
-        0th moment, in K km/s.
-    I_tpeak : np.ndarray
-        Peak temperature, in K.
-    alpha : float
-        CO(2-1) to H2 conversion factor.
-        Default: 6.7 (Msun pc^-2) / (K km s^-1)
 
-    Returns:
-    --------
-    rad : np.ndarray
-        Radius array.
-    (s/S)igma : np.ndarray
-        Maps for line width and surface density,
-        respectively.
-    '''
-    if isinstance(gal,Galaxy):
-        name = gal.name.lower()
-    elif isinstance(gal,str):
-        name = gal.lower()
-        gal = Galaxy(name.upper())
-    else:
-        raise ValueError("'gal' must be a str or galaxy!")
-    rad = gal.radius(header=hdr)
-    rad = rad.to(u.pc)                                      # Converts rad from Mpc to pc.
-    d = gal.distance
-    d = d.to(u.pc)                                          # Converts d from Mpc to pc.
-
-    # Pixel sizes
-    pixsizes_deg = wcs.utils.proj_plane_pixel_scales(wcs.WCS(hdr))*u.deg # The size of each pixel, in degrees. 
-                                                                         # Ignore that third dimension; that's 
-                                                                         # pixel size for the speed.
-    #print( "Pixel size, in degrees = "+str(pixsizes_deg[0]))
-    pixsizes = pixsizes_deg[0].to(u.rad)                    # Pixel size, in radians.
-    pcperpixel =  pixsizes.value*d                          # Number of parsecs per pixel.
-    #print( "Pixel size, in parsecs = "+str(pcperpixel))
-    pcperdeg = pcperpixel / pixsizes_deg[0]
-    #print( "There are +"+str(pcperdeg)+".")
-
-    # Beam
-    beam = beam * pcperdeg                                  # Beam size, in pc
-
-    # Line width, Surface density
-    #alpha = 6.7  # (???) Units: (Msun pc^-2) / (K km s^-1)
-    sigma = I_mom0 / (np.sqrt(2*np.pi) * I_tpeak)
-    Sigma = alpha*I_mom0   # (???) Units: Msun pc^-2
-    
-    if mode=='sigma':
-        return rad, sigma
-    elif mode=='Sigma':
-        return rad, Sigma
-    else:
-        print( "SELECT A MODE.")
