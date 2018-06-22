@@ -103,6 +103,8 @@ class Galaxy(object):
             if name.upper() == 'M51':
                 self.name = 'M51'
                 self.distance = 7.6 * u.Mpc
+                self.distance = 8.36 * u.Mpc
+
                 self.center_position = SkyCoord(
                      202.46954345703125, 47.19514846801758,
                     unit=(u.deg, u.deg), frame='fk5')
@@ -112,7 +114,7 @@ class Galaxy(object):
                 self.provenance = 'Override'
             if name.upper() == 'M33':
                 self.name = 'M33'
-                self.distance = 8.4e5 * u.pc
+                self.distance = 9.2e5 * u.pc
                 self.center_position = \
                     SkyCoord(23.4607, 30.6583, unit=(u.deg, u.deg),
                              frame='fk5')
@@ -142,7 +144,7 @@ class Galaxy(object):
                 self.position_angle = Angle(153 * u.deg)
                 self.inclination = Angle(30 * u.deg)
                 self.velocity = 1575 * u.km / u.s
-                self.provenance = 'Override'
+                self.provenance = 'Override
             elif name.upper() == 'M64':
                 self.name = 'M64'
                 self.distance = 4.1e6 * u.pc
@@ -150,18 +152,54 @@ class Galaxy(object):
                 self.inclination = Angle(58.9 * u.deg)
                 self.velocity = 411.3 * u.km / u.s
                 self.provenance = 'Override'
+            elif name.upper() == 'NGC4535':
+                self.name = 'NGC4535'
+                self.position_angle = Angle(0 * u.deg)
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC5068':
+                self.name = 'NGC5068'
+                self.position_angle = Angle(110 * u.deg)
+                self.provenance = 'Override'
+            elif name.upper() == 'IC5332':
+                self.position_angle = Angle(0 * u.deg)
+                self.provenance = 'Override'
+            # PHANGS Overrides from Sun et al. 2018
+            elif name.upper() == 'NGC0628':
+                self.distance = 9.0 * u.Mpc
+                self.provenance = 'Override'
             elif name.upper() == 'NGC1672':
                 self.name = 'NGC1672'
                 self.position_angle = Angle(141.9 * u.deg)  # PHANGS best fit parameters
                 self.inclination = Angle(24.7 * u.deg)      # PHANGS best fit parameters
                 #self.position_angle = Angle(124. * u.deg) #http://iopscience.iop.org/article/10.1086/306781/pdf
+                self.distance = 11.9 * u.Mpc
+                #http://iopscience.iop.org/article/10.1086/306781/pdf
                 #self.position_angle = Angle(170 * u.deg)
                 self.provenance = 'Override'
+            elif name.upper() == 'NGC2835':
+                self.distance == 10.1 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC3351':
+                self.distance == 10.0 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC3627':
+                self.distance == 8.28 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC4254':
+                self.distance == 16.8 * u.Mpc
+                self.provenance = 'Override'
+            elif name.upper() == 'NGC4303':
+                self.provenance = 'Override'
+                self.distance == 17.6 * u.Mpc
+            elif name.upper() == 'NGC4321':
+                self.provenance = 'Override'
+                self.distance == 15.2 * u.Mpc
             elif name.upper() == 'NGC4535':
                 self.name = 'NGC4535'
                 #self.position_angle = Angle(0 * u.deg)
                 self.position_angle = Angle(179.4 * u.deg)  # PHANGS best fit parameters
                 self.provenance = 'Override'
+                self.distance == 15.8 * u.Mpc
             elif name.upper() == 'NGC5068':
                 self.name = 'NGC5068'
                 #self.position_angle = Angle(110 * u.deg)
@@ -175,7 +213,11 @@ class Galaxy(object):
                 self.name = 'IC5332'
                 #self.position_angle = Angle(0 * u.deg)
                 self.provenance = 'Override'
-            #else:
+                self.distance == 9.0 * u.Mpc
+                self.position_angle = Angle(110 * u.deg)
+            elif name.upper() == 'NGC6744':
+                self.provenance = 'Override'
+                self.distance == 11.6 * u.Mpc
 
             if not self.provenance:
                 raise ValueError("The information for galaxy {}".format(name)+
@@ -245,7 +287,6 @@ class Galaxy(object):
             raise ValueError("Either wcs or header must be given.")
 
         return self.center_position.to_pixel(wcs)
-
 
     def rotcurve(self,mode='PHANGS',
                  #rcdir='/mnt/bigdata/PHANGS/OtherData/derived/Rotation_curves/'):
@@ -321,7 +362,55 @@ class Galaxy(object):
 #            R = np.roll(np.concatenate((R,[0]),0),1)
 #            vrot = np.roll(np.concatenate((vrot,[0]),0),1)
 
-        # BSpline interpolation of vrot(R)
+        def bspline(X,Y,knots,k=3,lowclamp=False, highclamp=False):
+            '''
+            Returns a BSpline interpolation function
+            of a provided 1D curve.
+            With fewer knots, this will provide a
+            smooth curve that ignores local wiggles.
+            
+            Parameters:
+            -----------
+            X,Y : np.ndarray
+                1D arrays for the curve being interpolated.
+            knots : int
+                Number of INTERNAL knots, i.e. the number
+                of breakpoints that are being considered
+                when generating the BSpline.
+            k : int
+                Degree of the BSpline. Recommended to leave
+                at 3.
+            lowclamp : bool
+                Enables or disables clamping at the lowest
+                X-value.
+            highclamp : bool
+                Enables or disables clamping at the highest
+                X-value.
+                
+            Returns:
+            --------
+            spl : scipy.interpolate._bsplines.BSpline
+                Interpolation function that works over X's
+                domain.
+            '''
+            
+            # Creating the knots
+            t_int = np.linspace(X.min(),X.max(),knots)  # Internal knots, incl. beginning and end points of domain.
+
+            t_begin = np.linspace(X.min(),X.min(),k)
+            t_end   = np.linspace(X.max(),X.max(),k)
+            t = np.r_[t_begin,t_int,t_end]              # The entire knot vector.
+            
+            # Generating the spline
+            w = np.zeros(X.shape)+1                     # Weights.
+            if lowclamp==True:
+                w[0]=X.max()*1000000                    # Setting a high weight for the X.min() term.
+            if highclamp==True:
+                w[-1]=X.max()*1000000                   # Setting a high weight for the X.max() term.
+            spl = interpolate.make_lsq_spline(X, Y, t, k,w)
+            
+            return spl
+        # BSpline of vrot(R)
         K=3                # Order of the BSpline
         t,c,k = interpolate.splrep(R,vrot,s=0,k=K)
         vrot = interpolate.BSpline(t,c,k, extrapolate=False)     # Cubic interpolation of vrot(R).
@@ -332,7 +421,7 @@ class Galaxy(object):
         
         return R, vrot, R_e, vrot_e
 
-    def rotmap(self,header=None,mode='PHANGS'):
+    def rotmap(self,header=None, position_angle=None, inclination=None):
         '''
         Returns "observed velocity" map, and "radius
         map". (The latter is just to make sure that the
@@ -368,10 +457,19 @@ class Galaxy(object):
         if vsys==None:
             vsys = self.velocity
             # For some reason, some galaxies (M33, NGC4303...) have velocity listed as "velocity" instead of "vsys".
-        I = self.inclination
+        if not inclination:
+            I = self.inclination
+        else:
+            I = inclination
+
+        if not position_angle:
+            PA = (self.position_angle / u.deg * u.deg)        # Position angle (angle from N to line of nodes)
+        else:
+            PA = position_angle
+    
         RA_cen = self.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees 
         Dec_cen = self.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees
-        PA = (self.position_angle / u.deg * u.deg)        # Position angle (angle from N to line of nodes)
+
                                                          # NOTE: The x-direction is defined as the LoN.
         d = (self.distance).to(u.parsec)                 # Distance to galaxy, from Mpc to pc
         
@@ -395,10 +493,8 @@ class Galaxy(object):
         RA = skycoord.ra                             # Grid of RA in degrees.
         Dec = skycoord.dec                           # Grid of Dec in degrees.
 
-
-        vobs = (vsys.value + vrot(rad)*np.sin(I)*np.cos( np.arctan2(Y,X) )) * (u.km/u.s)
-        
-        return vobs, rad, Dec, RA
+        vobs = (vsys.value + vrot(R)*np.sin(I)*np.cos( np.arctan2(Y,X) )) * (u.km/u.s)
+        return vobs, R, Dec, RA
 
 # push or pull override table using astropy.table
 
