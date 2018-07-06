@@ -62,6 +62,7 @@ class Galaxy(object):
         self.position_angle = None
         self.redshift = None
         self.vsys = None
+        self.PA_is_kinematic = False
         self.provenance = None
 
         if params is not None:
@@ -119,6 +120,7 @@ class Galaxy(object):
                     SkyCoord(23.4607, 30.6583, unit=(u.deg, u.deg),
                              frame='fk5')
                 self.position_angle = Angle(201.12 * u.deg)
+                self.PA_is_kinematic = True
                 self.inclination = Angle(55.08 * u.deg)
                 self.velocity = -179 * u.km / u.s
                 self.provenance = 'Override'
