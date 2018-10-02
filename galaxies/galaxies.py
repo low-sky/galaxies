@@ -115,7 +115,7 @@ class Galaxy(object):
                 self.provenance = 'Override'
             if name.upper() == 'M33':
                 self.name = 'M33'
-                self.distance = 9.2e5 * u.pc
+                self.distance = 8.4e5 * u.pc
                 self.center_position = \
                     SkyCoord(23.4607, 30.6583, unit=(u.deg, u.deg),
                              frame='fk5')
@@ -298,16 +298,16 @@ class Galaxy(object):
         returns interpolator functions for rotational
         velocity vs radius, and epicyclic frequency vs
         radius.
-        
+
         Parameters:
         -----------
         mode : str
             'PHANGS'     - Uses PHANGS rotcurve.
             'diskfit12m' - Uses fitted rotcurve from
-                            12m+7m data.        
+                            12m+7m data.
             'diskfit7m'  - Uses fitted rotcurve from
                             7m data.
-            
+
         Returns:
         --------
         R : np.ndarray
@@ -323,10 +323,10 @@ class Galaxy(object):
 
         # Basic info
         d = (self.distance).to(u.parsec)                  # Distance to galaxy, from Mpc to pc
-            
+
         rcdir_jnofech = '/media/jnofech/BigData/galaxies/rotcurves/'    # Joseph's main rotcurve directory,
                                                                         #   including the ones on the server.
-        
+
         # Rotation Curves
         if mode.lower()=='phangs':
             if self.name.lower()=='m33':
@@ -346,15 +346,15 @@ class Galaxy(object):
             R, vrot, vrot_e = np.loadtxt(fname,skiprows=True,unpack=True)
         else:
             raise ValueError("'mode' must be PHANGS, diskfit12m, or diskfit7m!")
-            
+
             # R = Radius from center of galaxy, in arcsec.
             # vrot = Rotational velocity, in km/s.
-        # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are 
+        # (!) When adding new galaxies, make sure R is in arcsec and vrot is in km/s, but both are
         #     floats!
 
         # Units & conversions
         R = R*u.arcsec
-        vrot = vrot*u.km/u.s    
+        vrot = vrot*u.km/u.s
         R = R.to(u.rad)            # Radius, in radians.
         R = (R*d).value            # Radius, in pc, but treated as unitless.
         R_e = np.copy(R)           # Radius, corresponding to error bars.
@@ -370,7 +370,7 @@ class Galaxy(object):
             of a provided 1D curve.
             With fewer knots, this will provide a
             smooth curve that ignores local wiggles.
-            
+
             Parameters:
             -----------
             X,Y : np.ndarray
@@ -388,21 +388,21 @@ class Galaxy(object):
             highclamp : bool
                 Enables or disables clamping at the highest
                 X-value.
-                
+
             Returns:
             --------
             spl : scipy.interpolate._bsplines.BSpline
                 Interpolation function that works over X's
                 domain.
             '''
-            
+
             # Creating the knots
             t_int = np.linspace(X.min(),X.max(),knots)  # Internal knots, incl. beginning and end points of domain.
 
             t_begin = np.linspace(X.min(),X.min(),k)
             t_end   = np.linspace(X.max(),X.max(),k)
             t = np.r_[t_begin,t_int,t_end]              # The entire knot vector.
-            
+
             # Generating the spline
             w = np.zeros(X.shape)+1                     # Weights.
             if lowclamp==True:
@@ -410,7 +410,7 @@ class Galaxy(object):
             if highclamp==True:
                 w[-1]=X.max()*1000000                   # Setting a high weight for the X.max() term.
             spl = interpolate.make_lsq_spline(X, Y, t, k,w)
-            
+
             return spl
         # BSpline of vrot(R)
         K=3                # Order of the BSpline
@@ -420,7 +420,7 @@ class Galaxy(object):
         # Creating "higher-resolution" rotation curve
         Nsteps = 10000
         R = np.linspace(R.min(),R.max(),Nsteps)
-        
+
         return R, vrot, R_e, vrot_e
 
     def rotmap(self,header=None, position_angle=None, inclination=None):
@@ -428,7 +428,7 @@ class Galaxy(object):
         Returns "observed velocity" map, and "radius
         map". (The latter is just to make sure that the
         code is working properly.)
-        
+
         Parameters:
         -----------
         gal : str OR Galaxy
@@ -439,10 +439,10 @@ class Galaxy(object):
         mode='PHANGS' : str
             'PHANGS'     - Uses PHANGS rotcurve.
             'diskfit12m' - Uses fitted rotcurve from
-                            12m+7m data.        
+                            12m+7m data.
             'diskfit7m'  - Uses fitted rotcurve from
                             7m data.
-            
+
         Returns:
         --------
         vobs : np.ndarray
@@ -451,9 +451,9 @@ class Galaxy(object):
             Map of radii in disk plane, up to
             extent of the rotcurve; in pc.
         Dec, RA : np.ndarray
-            2D arrays of the ranges of Dec and 
+            2D arrays of the ranges of Dec and
             RA (respectively), in degrees.
-        '''   
+        '''
         # Basic info
         vsys = self.vsys
         if vsys==None:
@@ -468,13 +468,13 @@ class Galaxy(object):
             PA = (self.position_angle / u.deg * u.deg)        # Position angle (angle from N to line of nodes)
         else:
             PA = position_angle
-    
-        RA_cen = self.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees 
+
+        RA_cen = self.center_position.ra / u.deg * u.deg          # RA of center of galaxy, in degrees
         Dec_cen = self.center_position.dec / u.deg * u.deg        # Dec of center of galaxy, in degrees
 
                                                          # NOTE: The x-direction is defined as the LoN.
         d = (self.distance).to(u.parsec)                 # Distance to galaxy, from Mpc to pc
-        
+
         # vrot Interpolation
         R_1d, vrot,R_e,vrot_e = self.rotcurve(mode=mode)
 
@@ -488,7 +488,7 @@ class Galaxy(object):
         #               to the line of nodes.
 
         rad = np.sqrt(X**2 + Y**2)                     # Grid of radius in parsecs.
-        rad = ( (rad.value<R_1d.max()) * (rad.value>R_1d.min())).astype(int) * rad  
+        rad = ( (rad.value<R_1d.max()) * (rad.value>R_1d.min())).astype(int) * rad
         rad[ rad==0 ] = np.nan                         # Grid of radius, with values outside interpolation range removed.
 
         skycoord = self.skycoord_grid(header=header)     # Coordinates (RA,Dec) of the above grid at each point, in degrees.
