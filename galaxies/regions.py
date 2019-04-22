@@ -6,8 +6,15 @@ across an image.
 
 import numpy as np
 
+try:
+    from shapely.geometry import Polygon, Point
+    HAS_SHAPLEY = True
+except ImportError:
+    HAS_SHAPLEY = False
 
-def calculate_hexagons(centerx, centery, shapex, shapey, radius):
+
+def calculate_hexagons(centerx, centery, shapex, shapey, radius,
+                       return_shapely=True):
     """
     Calculate a grid of hexagon coordinates of the given radius
     given lower-left and upper-right coordinates
@@ -50,9 +57,6 @@ def calculate_hexagons(centerx, centery, shapex, shapey, radius):
     # With the centres, now get the vertices of each
     polygons = []
 
-    # delta_x = radius * np.sqrt(3) / 2
-    # delta_y = radius / 2
-
     delta_y = radius * np.sqrt(3) / 2
     delta_x = radius / 2
 
@@ -78,14 +82,66 @@ def calculate_hexagons(centerx, centery, shapex, shapey, radius):
         p6x = startx + delta_x
         p6y = starty - delta_y
 
-        poly = [
-            (p1y, p1x),
-            (p2y, p2x),
-            (p3y, p3x),
-            (p4y, p4x),
-            (p5y, p5x),
-            (p6y, p6x),
-            (p1y, p1x)]
+        poly = [(p1y, p1x),
+                (p2y, p2x),
+                (p3y, p3x),
+                (p4y, p4x),
+                (p5y, p5x),
+                (p6y, p6x),
+                (p1y, p1x)]
         polygons.append(poly)
 
-    return pts, polygons
+    if return_shapely:
+        if not HAS_SHAPLEY:
+            raise ImportError("shapley could not be imported. Set "
+                              "`return_shapely=False`.")
+        shapely_polygons = []
+        for poly in polygons:
+            shapely_polygons.append(Polygon(poly))
+        return shapely_polygons
+    else:
+        return pts, polygons
+
+
+def region_mask(poly, shape, return_mask=True, return_posns=True):
+
+    if return_mask:
+        mask = np.zeros(shape, dtype=bool)
+
+    if return_posns:
+        posns_y = []
+        posns_x = []
+
+    # Define a grid based on the shape boundaries
+    min_x, min_y = np.floor(poly.bounds[:2]).astype(int) - 1
+    max_x, max_y = np.ceil(poly.bounds[2:]).astype(int)
+
+    yy, xx = np.mgrid[max(min_y, 0):min(max_y, shape[0]),
+                      max(min_x, 0):min(max_x, shape[1])]
+
+    for y, x in zip(yy.ravel(), xx.ravel()):
+
+        # Define pixels based on the mid-point so they have an area of 1.
+        pix_region = Polygon([(x - 0.5, y - 0.5),
+                              (x + 0.5, y - 0.5),
+                              (x + 0.5, y + 0.5),
+                              (x - 0.5, y + 0.5)])
+
+        if poly.intersects(pix_region):
+            if return_mask:
+                mask[y, x] = True
+            if return_posns:
+                posns_y.append(y)
+                posns_x.append(x)
+
+    return_both = return_mask * return_posns
+
+    if return_posns:
+        posns = np.vstack([posns_y, posns_x])
+
+    if return_both:
+        return mask, posns
+    elif return_mask:
+        return mask
+    elif return_posns:
+        return posns
