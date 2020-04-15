@@ -7,6 +7,7 @@ from astropy.wcs import WCS
 import warnings
 import numpy as np
 from astropy.utils.data import get_pkg_data_filename
+from astropy.utils.console import ProgressBar
 
 import pandas as pd
 from scipy import interpolate,optimize  # Added since scipy functions are used.
@@ -240,8 +241,14 @@ class Galaxy(object):
             w = wcs
         else:
             raise ValueError("header or wcs must be given.")
-        w = WCS(header)
-        ymat, xmat = np.indices((w.celestial._naxis2, w.celestial._naxis1))
+        # w = WCS(header)
+        try:
+            # This is deprecated
+            ymat, xmat = np.indices((w.celestial._naxis2,
+                                     w.celestial._naxis1))
+        except AttributeError:
+            ymat, xmat = np.indices(w.celestial.array_shape)
+
         ramat, decmat = w.celestial.wcs_pix2world(xmat, ymat, 0)
         return SkyCoord(ramat, decmat, unit=(u.deg, u.deg))
 
@@ -290,7 +297,7 @@ class Galaxy(object):
 
         return self.center_position.to_pixel(wcs)
 
-    def rotcurve(self,mode='PHANGS',
+    def rotcurve(self, mode='PHANGS',
                  #rcdir='/mnt/bigdata/PHANGS/OtherData/derived/Rotation_curves/'):
                  rcdir='/media/jnofech/BigData/galaxies/rotcurves/'):
         '''
