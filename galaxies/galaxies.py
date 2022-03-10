@@ -94,12 +94,13 @@ class Galaxy(object):
                         self.canonical_name = t['Object Name'][0]
                         self.velocity = t['Velocity'][0] * u.km / u.s
                         self.center_position = \
-                            SkyCoord(t['RA(deg)'][0], t['DEC(deg)'][0],
+                            SkyCoord(t['RA'][0], t['DEC'][0],
                                      frame='fk5',
                                      unit='degree')
                         self.redshift = t['Redshift'][0]
                         self.provenance = 'NED'
                 except:
+                    raise ValueError
                     warnings.warn("Unsuccessful query to NED")
                     pass
             if name.upper() == 'M51':
@@ -222,7 +223,7 @@ class Galaxy(object):
                 self.provenance = 'Override'
                 self.distance == 11.6 * u.Mpc
 
-            if not self.provenance:
+            if self.provenance is None:
                 raise ValueError("The information for galaxy {}".format(name)+
                                  "could not be found.")
 
